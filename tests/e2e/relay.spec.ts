@@ -1,11 +1,14 @@
 import { expect, test as base, type Page } from "@playwright/test";
 
-// Every test also fails on uncaught errors in the page.
+// Every test also fails on uncaught errors in the page. WebKit reports Next.js prefetches cut short by
+// page.goto as "due to access control checks"; those are not app errors.
 const test = base.extend<{ pageErrors: string[] }>({
   pageErrors: [
     async ({ page }, use) => {
       const errors: string[] = [];
-      page.on("pageerror", (e) => errors.push(e.message));
+      page.on("pageerror", (e) => {
+        if (!e.message.endsWith("due to access control checks.")) errors.push(e.message);
+      });
       await use(errors);
       expect(errors).toEqual([]);
     },
@@ -196,7 +199,12 @@ test("inbox filters, search and resolve", async ({ page }) => {
   await expect(page.getByText("Conversation resolved.")).toBeVisible();
   if (isMobile(page)) await page.getByRole("button", { name: "Back to conversations" }).click();
   await expect(list.getByRole("button")).toHaveCount(2);
-  await page.getByRole("tab", { name: /^All/ }).click();
+  // On phones the list slides back in, and a click during that can miss the tab.
+  const all = page.getByRole("tab", { name: /^All/ });
+  await expect(async () => {
+    await all.click();
+    await expect(all).toHaveAttribute("aria-selected", "true", { timeout: 1000 });
+  }).toPass();
   await page.getByLabel("Search conversations").fill("kayaks");
   await expect(list.getByRole("button").first()).toBeVisible();
   await page.getByLabel("Search conversations").fill("zzzz-nothing");
