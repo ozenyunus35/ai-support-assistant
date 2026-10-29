@@ -175,7 +175,8 @@ function AssistantMessage({
 
 export function ChatWidget() {
   const state = useStore();
-  const [open, setOpen] = useState(false);
+  // null until the saved preference is read, so nothing flips open after the first paint.
+  const [open, setOpen] = useState<boolean | null>(null);
   const [details, setDetails] = useState(true);
   const [thinking, setThinking] = useState(false);
   const [draft, setDraft] = useState("");
@@ -260,7 +261,7 @@ export function ChatWidget() {
     return () => window.removeEventListener("keydown", onKey);
   }, [open, setOpenSaved]);
 
-  if (!state) return null;
+  if (!state || open === null) return null;
   const { settings } = state;
   const agent = conv?.assigneeId ? state.agents.find((a) => a.id === conv.assigneeId) : undefined;
   const lastAnswerId = [...(conv?.messages ?? [])].reverse().find((m) => m.role === "assistant")?.id;
@@ -402,6 +403,7 @@ export function ChatWidget() {
 
       <button
         onClick={() => setOpenSaved(!open)}
+        data-testid="chat-launcher"
         aria-label={open ? "Close chat" : "Open chat"}
         aria-expanded={open}
         className={cx("fixed right-5 bottom-5 z-50 grid size-12 place-items-center rounded-full bg-accent text-accent-fg shadow-pop transition-transform duration-200 hover:scale-[1.04] active:scale-95", open && "max-sm:hidden")}

@@ -17,7 +17,10 @@ const isMobile = (page: Page) => (page.viewportSize()?.width ?? 1280) < 1024;
 
 async function openWidget(page: Page) {
   const panel = page.getByRole("dialog", { name: "Chat with Northfold support" });
-  if (!(await panel.isVisible())) await page.getByRole("button", { name: "Open chat" }).click();
+  // The launcher is hidden behind the full-screen chat on phones, so find it by test id.
+  const launcher = page.getByTestId("chat-launcher");
+  await expect(launcher).toBeAttached();
+  if ((await launcher.getAttribute("aria-expanded")) !== "true") await launcher.click();
   await expect(panel).toBeVisible();
   return panel;
 }
@@ -184,6 +187,7 @@ test("settings preview the threshold and change the widget", async ({ page }) =>
 test("inbox filters, search and resolve", async ({ page }) => {
   await page.goto("./admin/inbox/");
   const list = page.getByRole("list", { name: "Conversations" });
+  await expect(list.getByRole("button").first()).toBeVisible();
   await page.getByRole("tab", { name: /Needs a person/ }).click();
   const waiting = list.getByRole("button");
   await expect(waiting).toHaveCount(3);
