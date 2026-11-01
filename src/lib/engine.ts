@@ -24,6 +24,20 @@ const GREETING = /^(hi|hello|hey|hiya|good (morning|afternoon|evening)|yo)\b/i;
 const THANKS = /\b(thanks|thank you|thx|cheers|perfect|awesome|great|got it|that helps|helpful)\b/i;
 /** Word stems that may appear in a plain "thanks" message without making it a question. */
 const THANKS_TERMS = new Set(["great", "perfect", "awesom", "helpful", "help", "good", "nic", "cool", "brilliant", "wonderful", "appreciat", "lovely"]);
+const IDENTITY = /\b(who|what) are you\b|\bare you (a |an )?(bot|robot|human|real|ai|person)\b|\byour name\b/i;
+const HOW_TO = /^\s*(how (do|can|should|would) (i|we)|how to)\b/i;
+const PRICE = /\b(price|prices|cost|costs|how much)\b/i;
+const POLICY_WORDS = /\b(ship|shipping|deliver|delivery|return|refund|exchange|fee|fees|membership|club|rent|rental|repair|warranty|label|duties|tax|klarna|gift card)\b/i;
+const SHIP_WORDS = /\b(ship|ships|shipping|deliver|delivers|delivery|send|post)\b/i;
+// Letters and words that only show up when someone writes in another language.
+const OTHER_LANGUAGE = /[ığşİĞŞñ¿¡ßœ]|\b(nasıl|neden|nerede|kargo|sipariş|iade|merhaba|cómo|dónde|envío|pedido|hola|wie|wo|bestellung|versand|rückgabe|hallo|bonjour|commande|livraison|où|olá|encomenda)\b/i;
+
+/** Countries the help center lists in "International shipping", plus the US itself. */
+const SHIPS_TO = ["united states", "usa", "us", "america", "canada", "united kingdom", "uk", "britain", "england", "scotland", "wales", "norway", "switzerland", "australia", "new zealand", "singapore", "japan", "united arab emirates", "uae", "dubai",
+  "germany", "france", "spain", "italy", "netherlands", "holland", "belgium", "austria", "ireland", "portugal", "poland", "sweden", "denmark", "finland", "greece", "czechia", "czech republic", "hungary", "romania", "bulgaria", "croatia", "slovakia", "slovenia", "estonia", "latvia", "lithuania", "luxembourg", "malta", "cyprus"];
+const NOT_YET = ["turkey", "türkiye", "turkiye", "mexico", "brazil", "argentina", "chile", "colombia", "peru", "india", "pakistan", "bangladesh", "china", "hong kong", "taiwan", "south korea", "korea", "indonesia", "malaysia", "thailand", "vietnam", "philippines", "russia", "ukraine", "israel", "saudi arabia", "qatar", "kuwait", "egypt", "morocco", "nigeria", "kenya", "south africa", "iceland", "serbia"];
+const titleCase = (c: string) => (c.length <= 3 ? c.toUpperCase() : c.replace(/\b\p{L}/gu, (m) => m.toUpperCase()));
+
 const HUMAN = /\b(human|agent|representative|operator|real person|a person|someone real|live (chat|support)|talk to (someone|somebody|support|the team|a person)|speak (to|with))\b/i;
 const ORDER_NO = /\bNF[-\s]?(\d{5})\b/i;
 const MY_ORDER = /\bmy (order|package|parcel|delivery|shipment)\b/i;
@@ -40,6 +54,8 @@ export const words = (s: string) => fold(s).split(/[^a-z0-9]+/).filter(Boolean);
 /** A deliberately small suffix stripper: enough to match plurals and verb forms. */
 export function stem(w: string): string {
   if (/^us(e|es|ing)$/.test(w)) return "use";
+  // Short words the rules below would cut to something else ("shoes" → "sho", then read as "show").
+  if (/^(shoe|toe|hoe)s?$/.test(w)) return w.replace(/s$/, "");
   if (w.length <= 3 || /^\d/.test(w)) return w;
   let s = w;
   if (s.endsWith("ies") && s.length > 4) s = s.slice(0, -3) + "y";
@@ -404,6 +420,33 @@ export function createEngine(articles: Article[], synonymGroups: SynonymGroup[])
 
     if (HUMAN.test(question)) return { ...base, kind: "handoff", confidence: 1, handoff: true, text: "" };
 
+    if (IDENTITY.test(question))
+      return { ...base, kind: "greeting", confidence: 1, text: "I'm Northfold's virtual assistant. I answer from our help center, show you the article I used, and pass you to a person when I'm not sure." };
+
+    if (OTHER_LANGUAGE.test(question))
+      return { ...base, kind: "clarify", confidence: 0, text: "Sorry, I can only answer in English for now. Could you ask again in English? If you prefer, type “talk to a person” and the team will reply by email." };
+
+    // "Do you ship to Turkey?": answer from the country list instead of guessing.
+    const lower = fold(question);
+    const shipping = SHIP_WORDS.test(question) || /\b(to|in)\b/.test(lower);
+    const yes = SHIPS_TO.find((c) => new RegExp(`\\b${fold(c)}\\b`).test(lower));
+    const no = NOT_YET.find((c) => new RegExp(`\\b${fold(c)}\\b`).test(lower));
+    const intl = chunks.find((c) => c.article.id === "international-shipping" && !c.heading) ?? chunks.find((c) => c.article.id === "international-shipping");
+    if (SHIP_WORDS.test(question) && shipping && (yes || no) && intl) {
+      const country = titleCase(no ?? yes!);
+      const domestic = yes && ["united states", "usa", "us", "america"].includes(yes);
+      const text = no
+        ? `We don't ship to ${country} yet. We ship to the US, Canada, the United Kingdom, the European Union, Norway, Switzerland, Australia, New Zealand, Singapore, Japan and the United Arab Emirates, and add countries a few times a year.`
+        : domestic
+          ? "Yes, we ship everywhere in the United States. Standard shipping takes 3 to 5 business days."
+          : `Yes, we ship to ${country}. International orders arrive in 5 to 10 business days, and shipping is free over $150, otherwise a flat $19.`;
+      return { ...base, kind: "answer", confidence: 1, text, citations: [cite(intl)], matched: [country] };
+    }
+
+    // Prices and stock of single products live on the product pages, not in the help center.
+    if (PRICE.test(question) && !POLICY_WORDS.test(question))
+      return { ...base, kind: "clarify", confidence: 1, text: "I can't see live prices or stock. The product page at northfold.example shows the current price, sizes and availability. I can help with shipping, returns, sizing or warranty questions." };
+
     if (THANKS.test(question) && content.every((t) => THANKS_TERMS.has(t)))
       return { ...base, kind: "thanks", confidence: 1, text: "You're welcome! Is there anything else I can help with?" };
 
@@ -422,8 +465,20 @@ export function createEngine(articles: Article[], synonymGroups: SynonymGroup[])
       };
     }
 
+    // "How do I return…" wants the step-by-step article when it is a close match.
+    if (HOW_TO.test(question) && ranked[0] && !ranked[0].c.article.title.startsWith("How to")) {
+      const howTo = ranked.findIndex((r) => r.c.article.title.startsWith("How to") && r.score >= ranked[0].score * 0.45);
+      if (howTo > 0) {
+        ranked = [ranked[howTo], ...ranked.filter((_, i) => i !== howTo)];
+        confidence = confidenceOf(analysis.terms, ranked[0]).confidence;
+      }
+    }
+
     const top = ranked[0];
-    if (!top || confidence < opts.threshold) return { ...base, kind: "handoff", confidence, handoff: true, text: "", citations: top ? [cite(top.c)] : [] };
+    // Nothing in the question matches the help center at all (gibberish, off-topic): ask again rather than open a ticket.
+    if (!top || (confidence < 0.12 && !top.matched.length))
+      return { ...base, kind: "clarify", confidence, text: "I'm not sure I understood. I can help with orders, shipping, returns, sizing and warranty. Try “How do I start a return?”, or type “talk to a person”." };
+    if (confidence < opts.threshold) return { ...base, kind: "handoff", confidence, handoff: true, text: "", citations: [cite(top.c)] };
 
     const citations = [cite(top.c)];
     const second = ranked.find((r) => r.c.article.id !== top.c.article.id);

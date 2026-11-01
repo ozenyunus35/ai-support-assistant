@@ -71,8 +71,34 @@ describe("retrieval", () => {
   });
 });
 
+describe("questions outside the articles", () => {
+  it("answers shipping by country from the country list", () => {
+    expect(ask("do you ship to brazil").text).toMatch(/^We don't ship to Brazil yet/);
+    expect(ask("Do you deliver to Germany?").text).toMatch(/^Yes, we ship to Germany/);
+    expect(ask("do you ship to Turkey?")).toMatchObject({ kind: "answer", handoff: false });
+  });
+
+  it("does not guess product prices", () => {
+    expect(ask("price of tent").kind).toBe("clarify");
+    expect(ask("how much is shipping").kind).toBe("answer");
+  });
+
+  it("introduces itself and asks for English", () => {
+    expect(ask("who are you?").text).toMatch(/virtual assistant/);
+    expect(ask("iade nasıl yapılır").text).toMatch(/only answer in English/);
+  });
+
+  it("asks again instead of opening a ticket for gibberish", () => {
+    expect(ask("asdfghjkl")).toMatchObject({ kind: "clarify", handoff: false });
+  });
+
+  it("prefers the step-by-step article for how-to questions", () => {
+    expect(ask("how do I return shoes").citations[0].title).toBe("How to start a return");
+  });
+});
+
 describe("handoff", () => {
-  it.each(["do you sell kayaks?", "do you ship to brazil", "do you have a student discount", "what's the weather like"])("hands off %j", (q) => {
+  it.each(["do you sell kayaks?", "do you have a student discount", "what's the weather like"])("hands off %j", (q) => {
     const r = ask(q);
     expect(r.kind).toBe("handoff");
     expect(r.handoff).toBe(true);

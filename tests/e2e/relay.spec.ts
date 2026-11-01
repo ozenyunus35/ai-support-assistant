@@ -117,7 +117,7 @@ test("unsure answers go to a person, and the reply from the inbox reaches the wi
 test("talk to a person hands off at once", async ({ page }) => {
   await page.goto("./");
   const panel = await ask(page, "Do you ship to Canada?");
-  await expect(panel.getByText(/We ship to Canada/)).toBeVisible();
+  await expect(panel.getByText(/Yes, we ship to Canada/)).toBeVisible();
   await panel.getByRole("button", { name: "Talk to a person" }).click();
   await expect(panel.getByText("Waiting for a teammate")).toBeVisible();
   await panel.getByRole("button", { name: "Start a new conversation" }).click();
