@@ -54,12 +54,30 @@ const weightOf = (t: string) => GENERIC.get(t) ?? (INTENT.has(t) ? 1.5 : 1);
  * Phrases customers split around other words: "send my order back" is "send back",
  * "the tent came broken" is "arrived damaged" (not a warranty claim), "your email" is the support email.
  */
+/** Texting shorthand, expanded before matching: "hw do u track ur order pls". */
+const SHORTHAND: Record<string, string> = {
+  u: "you", ur: "your", r: "are", pls: "please", plz: "please", hw: "how", wat: "what", wut: "what", cuz: "because", bc: "because",
+  thx: "thanks", ty: "thanks", abt: "about", pkg: "package", msg: "message", rn: "now", wanna: "want to", gonna: "going to", dont: "do not", cant: "cannot",
+};
+
 function rephrase(text: string) {
   return text
+    .replace(/[\p{L}']+/gu, (w) => SHORTHAND[w.toLowerCase()] ?? w)
     .replace(/\b(send|give|take|bring|mail|post)\s+((?:[\p{L}'-]+\s+){1,3}?)back\b/giu, "$1 back $2")
     // "What's your email?" asks for ours; "change my email" is about the account.
     .replace(/\byour e-?mail(?: address)?\b/giu, "support email")
-    .replace(/\b(arrived|came|showed up|was delivered|got here)\s+(?:(?:all|completely|totally|already)\s+)?(broken|broke|damaged|cracked|smashed|dented|torn|ripped|bent|crushed)\b/giu, "arrived damaged");
+    .replace(/\b(arrived|came|showed up|was delivered|got here)\s+(?:(?:all|completely|totally|already)\s+)?(broken|broke|damaged|cracked|smashed|dented|torn|ripped|bent|crushed|snapped|scratched|leaking)\b/giu, "arrived damaged")
+    .replace(/\b(broken|broke|damaged|cracked|smashed|dented|torn|ripped|bent|crushed|snapped|scratched)\s+(when|as|once)\s+(it|they|the \w+)\s+(arrived|came|got here)\b/giu, "arrived damaged")
+    // "update the address on my order", "add an item to my order": a change to the order itself.
+    .replace(/\badd\s+((?:[\p{L}'-]+\s+){0,3}?)(?:to|in)\s+(?:my|the|this)\s+order\b/giu, "add to my order $1")
+    .replace(/\b(change|update|edit|fix|correct|remove)\s+((?:[\p{L}'-]+\s+){0,3}?)(?:on|in|from)\s+(?:my|the|an|this)\s+order\b/giu, "$1 my order $2")
+    // "my refund hasn't arrived" is about the refund, not a missing parcel.
+    .replace(/\b(refund|money)\s+((?:[\p{L}'-]+\s+){0,2}?)(?:hasn'?t|has not|didn'?t|did not|never|still hasn'?t|not yet)\s+(?:arrived|come|came|shown up|showed up|been received|received|landed)\b/giu, "refund not received")
+    .replace(/\b(?:club|membership)\s+(?:cost|costs|price|fee)\b|\b(?:cost|price) of (?:the )?(?:club|membership)\b/giu, "club cost")
+    .replace(/\b(?:received|got|sent me|you sent)\s+(?:the|a|an)?\s*wrong\b/giu, "wrong item")
+    // "only 2 of the 3 items came", "half my order": part of the order is missing.
+    .replace(/\b(?:only|just)\s+(?:\d+|one|two|three|four|some|part)\s+(?:of|out of)\s+(?:the|my)?\s*(?:\d+|one|two|three|four|five)?\b/giu, "missing item ")
+    .replace(/\bhalf\s+(?:of\s+)?(?:my|the)\s+(?:order|package|parcel|items|stuff)\b/giu, "missing item");
 }
 
 /** "not the return policy", "I don't want a refund": the words right after are what the customer doesn't mean. */
@@ -80,6 +98,8 @@ const SHIP_WORDS = /\b(ship|ships|shipping|deliver|delivers|delivery|send|post)\
 // Letters and words that only show up when someone writes in another language.
 /** Confidence given to a clear winner; a stricter threshold set by the team still hands these off. */
 const CLEAR_WINNER = 0.5;
+/** A section matching the customer's intent wins when it scores at least this share of the best one. */
+const NAMED_RATIO = 0.6;
 
 /** Weather forecasts: nothing in the help center can answer them, however much they mention rain or snow. */
 const WEATHER = /\b(weather|forecast|will it (rain|snow)|is it (going to )?(rain|snow)|(rain|snow)(ing)? (today|tomorrow|tonight|this weekend))\b/i;
@@ -194,6 +214,20 @@ export interface Reply {
   matched: string[];
   handoff: boolean;
   order?: OrderCard;
+  /** What the confidence was computed from, for the retrieval details view. */
+  signals?: Signals;
+}
+
+/** Per-question signals about the best article; confidence is a fitted function of these. */
+export interface Signals {
+  coverage: number;
+  strength: number;
+  /** How far the best article is ahead of the next one: log of the score ratio, 0..3. */
+  margin: number;
+  /** Share of the question's words that the help center never uses. */
+  unknown: number;
+  /** 1 when the question states an intent ("return", "repair") and the best section matches it, -1 when it doesn't, 0 without one. */
+  intent: number;
 }
 
 export interface Explanation {
@@ -361,6 +395,8 @@ export function createEngine(articles: Article[], synonymGroups: SynonymGroup[])
     c.tf.forEach((_, t) => set.add(t));
     articleTerms.set(c.article.id, set);
   }
+  // Words in a section's article title and heading: what the section is named after.
+  const nameTerms = new Map(chunks.map((c) => [c.id, new Set(analyse(`${c.article.title} ${c.heading ?? ""}`, false).terms)]));
   const N = Math.max(1, chunks.length);
   const avgLen = chunks.reduce((s, c) => s + c.len, 0) / N || 1;
   const idf = (t: string) => {
@@ -413,6 +449,19 @@ export function createEngine(articles: Article[], synonymGroups: SynonymGroup[])
    *   help center never uses count fully against it; known words found elsewhere count half.
    * - strength: how strongly the best section matches, squashed into 0..1.
    */
+  function signalsOf(terms: string[], ranked: Array<{ c: Chunk; score: number; matched: string[] }>): Signals {
+    const top = ranked[0];
+    const { coverage, strength } = confidenceOf(terms, top);
+    const uniq = [...new Set(terms)];
+    if (!top || !uniq.length) return { coverage, strength, margin: 0, unknown: 1, intent: 0 };
+    const runnerUp = ranked.find((r) => r.c.article.id !== top.c.article.id);
+    const margin = Math.min(3, Math.max(0, Math.log(top.score / Math.max(0.5, runnerUp?.score ?? 0))));
+    const unknown = uniq.filter((t) => !df.has(t)).length / uniq.length;
+    const intents = uniq.filter((t) => INTENT.has(t));
+    const intent = !intents.length ? 0 : top.matched.some((t) => intents.includes(t)) ? 1 : -1;
+    return { coverage, strength, margin, unknown, intent };
+  }
+
   function confidenceOf(terms: string[], top: { c: Chunk; score: number } | undefined) {
     const uniq = [...new Set(terms)];
     if (!top || !uniq.length) return { coverage: 0, strength: 0, confidence: 0 };
@@ -596,12 +645,21 @@ export function createEngine(articles: Article[], synonymGroups: SynonymGroup[])
     // The customer's intent ("repair", "return", "cancel") outweighs a rarer side word ("down" in
     // "patch a hole in my down jacket"): prefer a close section that matches the intent.
     const intents = content.filter((t) => INTENT.has(t));
+    const promote = (i: number) => {
+      ranked = [ranked[i], ...ranked.filter((_, j) => j !== i)];
+      confidence = confidenceOf(analysis.terms, ranked[0]).confidence;
+    };
     if (intents.length && ranked[0] && !ranked[0].matched.some((t) => intents.includes(t))) {
-      const byIntent = ranked.findIndex((r) => r.matched.some((t) => intents.includes(t)) && r.score >= ranked[0].score * 0.6);
-      if (byIntent > 0) {
-        ranked = [ranked[byIntent], ...ranked.filter((_, i) => i !== byIntent)];
-        confidence = confidenceOf(analysis.terms, ranked[0]).confidence;
-      }
+      const byIntent = ranked.findIndex((r) => r.matched.some((t) => intents.includes(t)) && r.score >= ranked[0].score * NAMED_RATIO);
+      if (byIntent > 0) promote(byIntent);
+    }
+    // A section named after the intent ("Exchanges…", "Where is my refund?") beats one that only mentions
+    // it, unless that one matches clearly more of the question ("money back for a used tent" is about used gear).
+    const named = (r: (typeof ranked)[number]) => intents.some((t) => nameTerms.get(r.c.id)!.has(t));
+    if (intents.length && ranked[0] && !named(ranked[0])) {
+      const top = ranked[0];
+      const i = ranked.findIndex((r) => named(r) && r.score >= top.score * NAMED_RATIO && new Set(r.matched).size >= new Set(top.matched).size - 1);
+      if (i > 0) promote(i);
     }
 
     const top = ranked[0];
@@ -611,17 +669,20 @@ export function createEngine(articles: Article[], synonymGroups: SynonymGroup[])
     // A clear winner: the best article matches strongly, covers a good part of the question and
     // scores well above any other article. Words the help center never uses ("stuck", "half")
     // then shouldn't be enough to hand off on their own.
+    // A weaker match also counts when it is at least twice as strong as any other article and
+    // doesn't miss the intent the customer stated.
+    const signals = signalsOf(analysis.terms, ranked);
     if (confidence < opts.threshold) {
-      const runnerUp = ranked.find((r) => r.c.article.id !== top.c.article.id);
-      const { coverage, strength } = confidenceOf(analysis.terms, top);
-      if (strength >= 0.5 && coverage >= 0.4 && top.score >= (runnerUp?.score ?? 0) * 1.5) confidence = Math.max(confidence, CLEAR_WINNER);
+      const { coverage, strength, margin, intent } = signals;
+      const clear = (strength >= 0.5 && coverage >= 0.4 && margin >= Math.log(1.5)) || (strength >= 0.4 && coverage >= 0.3 && margin >= Math.log(2) && intent >= 0);
+      if (clear) confidence = Math.max(confidence, CLEAR_WINNER);
     }
-    if (confidence < opts.threshold) return { ...base, kind: "handoff", confidence, handoff: true, text: "", citations: [cite(top.c)] };
+    if (confidence < opts.threshold) return { ...base, kind: "handoff", confidence, handoff: true, text: "", citations: [cite(top.c)], signals };
 
     const citations = [cite(top.c)];
     const second = ranked.find((r) => r.c.article.id !== top.c.article.id);
     if (second && second.score >= top.score * 0.75) citations.push(cite(second.c));
-    return { ...base, kind: "answer", confidence, text: compose(top.c, analysis.terms), citations, matched: top.matched.map((t) => analysis.surface[t] ?? t) };
+    return { ...base, kind: "answer", confidence, text: compose(top.c, analysis.terms), citations, matched: top.matched.map((t) => analysis.surface[t] ?? t), signals };
   }
 
   return { analyse, search, searchArticles, answer, explain, chunkCount: chunks.length };

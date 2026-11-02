@@ -1,7 +1,9 @@
 // Answer quality on question sets, with floors that a change must not drop below.
 // - tuning-questions*.json: sets the engine was tuned on (they will look better than reality).
-// - holdout-questions.json: written before the last round of changes and never tuned on.
-// - random questions: generated from templates with typos and noise; seeds never tuned on.
+// - holdout-questions.json: the first holdout; it became a tuning set in the second round.
+// - holdout-questions-2.json: written before the second round and never tuned on.
+// - random questions: two generators with different templates and noise (typos, texting shorthand,
+//   stories around the question); the seeds checked here were never tuned on.
 // Rates measured on 2 Nov 2026 are in the comments; the floors leave a little room.
 import { describe, expect, it } from "vitest";
 import { createEngine } from "@/lib/engine";
@@ -10,7 +12,9 @@ import { createSeed } from "@/lib/seed";
 import tuning from "./fixtures/tuning-questions.json";
 import tuning2 from "./fixtures/tuning-questions-2.json";
 import holdout from "./fixtures/holdout-questions.json";
+import holdout2 from "./fixtures/holdout-questions-2.json";
 import { randomQuestions } from "./fixtures/random-questions";
+import { randomQuestions2 } from "./fixtures/random-questions-2";
 
 const engine = createEngine(ARTICLES, SYNONYMS);
 const opts = { threshold: 0.45, orders: createSeed(Date.parse("2026-10-29T12:00:00Z")).orders };
@@ -33,21 +37,30 @@ function score(set: Array<[string, string] | { q: string; want: string }>) {
 }
 
 describe("answer quality", () => {
-  it("tuning questions (114/125 and 73/100 measured)", () => {
+  it("tuning questions (90%, 79% and 77% right measured)", () => {
     expect(score(tuning as Array<[string, string]>).right).toBeGreaterThanOrEqual(0.88);
-    expect(score(tuning2 as Array<[string, string]>).right).toBeGreaterThanOrEqual(0.7);
-  });
-
-  it("holdout questions (73% right, 7% confidently wrong measured; 57% and 10% before)", () => {
+    expect(score(tuning2 as Array<[string, string]>).right).toBeGreaterThanOrEqual(0.75);
     const s = score(holdout as Array<[string, string]>);
-    expect(s.right).toBeGreaterThanOrEqual(0.7);
-    expect(s.wrong).toBeLessThanOrEqual(0.08);
+    expect(s.right).toBeGreaterThanOrEqual(0.74);
+    expect(s.wrong).toBeLessThanOrEqual(0.05);
   });
 
-  it.each([31337, 4242, 123456])("random questions, seed %i (77% right, 1.5% confidently wrong measured; 44% and 7% before)", (seed) => {
+  it("second holdout (67% right, 9% confidently wrong measured; 65% and 7% before the second round)", () => {
+    const s = score(holdout2 as Array<[string, string]>);
+    expect(s.right).toBeGreaterThanOrEqual(0.64);
+    expect(s.wrong).toBeLessThanOrEqual(0.1);
+  });
+
+  it.each([31337, 4242, 123456])("random questions, seed %i (81% right, 0.5% confidently wrong measured; 44% and 7% at first)", (seed) => {
     const s = score(randomQuestions(2000, seed));
-    expect(s.right).toBeGreaterThanOrEqual(0.74);
-    expect(s.wrong).toBeLessThanOrEqual(0.025);
+    expect(s.right).toBeGreaterThanOrEqual(0.78);
+    expect(s.wrong).toBeLessThanOrEqual(0.015);
+  });
+
+  it.each([22, 33])("second generator, seed %i (63% right, 4% confidently wrong measured; 51% and 7% before)", (seed) => {
+    const s = score(randomQuestions2(3000, seed));
+    expect(s.right).toBeGreaterThanOrEqual(0.6);
+    expect(s.wrong).toBeLessThanOrEqual(0.055);
   });
 
   it("never answers off-topic random questions from an article", () => {

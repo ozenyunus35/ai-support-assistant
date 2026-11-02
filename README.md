@@ -65,7 +65,8 @@ Everything is in [`src/lib/engine.ts`](src/lib/engine.ts):
    never uses count fully against it), and how strongly the best section matches. A clear winner (strong match,
    well ahead of every other article) is answered even when the question has a few unknown words.
    The customer's intent ("repair", "cancel", "return") outweighs a rare side word, and what they say they
-   don't want ("I don't need a refund") is dropped.
+   don't want ("I don't need a refund") is dropped. Texting shorthand ("hw do u track ur order") and split
+   phrases ("send my order back", "broken when it arrived", "only 2 of the 3 items came") are normalised first.
 4. **Answer or hand off:** above the threshold, the reply is composed from the most relevant sentences of that
    section and cites it; below it, the chat goes to the team.
 
@@ -112,13 +113,20 @@ BASE_URL=https://ozenyunus35.github.io/ai-support-assistant/ npm run test:e2e   
   with floors a change can't drop below: two sets it was tuned on, a holdout set it was never tuned on, and
   thousands of random customer questions from a generator with typos, filler and emotional openers.
 
-  | Measured on 2 Nov 2026 | Before | Now |
+  | Measured on 2 Nov 2026, on questions never used for tuning | First version | Now |
   | --- | --- | --- |
-  | Holdout (100 questions): right | 57% | 73% |
-  | Holdout: answered from the wrong article | 10% | 7% |
-  | Random (12,000 questions, 3 unseen seeds): right | 44% | 77% |
-  | Random: answered from the wrong article | 7.1% | 1.5% |
+  | Random questions, generator 1 (9,000): right | 44% | 81% |
+  | Random questions, generator 1: answered from the wrong article | 7.1% | 0.5% |
+  | Random questions, generator 2 with texting shorthand and stories (6,000): right | 51% | 63% |
+  | Random questions, generator 2: answered from the wrong article | 7.1% | 4.0% |
+  | Second holdout (100 hand-written questions): right | 65% | 67% |
+  | Second holdout: answered from the wrong article | 7% | 9% |
   | Off-topic questions answered from an article | 0 | 0 |
+
+  Generator 2 and the second holdout were written before the second round of changes; generator 2's seed 11
+  was used to check each change, the other seeds and the holdout only for the final numbers. A first holdout
+  showed the first round had overfit its tuning questions (it moved only 57% → 58%), so it was turned into a
+  tuning set and the approach changed to general rules.
 
   The rest are handed to a person, which is the safe failure for a support assistant.
 

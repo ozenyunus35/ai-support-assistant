@@ -46,6 +46,20 @@ describe("phrasing customers use", () => {
     expect(cites(q)).not.toBe(wrongBefore);
   });
 
+  it.each([
+    ["hw do u track ur order pls", "track-order"],
+    ["wat payment methods do u take", "payment-methods"],
+    ["the zipper was broken when it arrived", "missing-damaged"],
+    ["only 2 of the 3 items showed up", "missing-damaged"],
+    ["i received the wrong product", "missing-damaged"],
+    ["can I still add an item to my order", "change-cancel-order"],
+    ["i already emailed but no reply, my refund hasn't arrived", "refund-status"],
+    ["what does the club cost", "northfold-club"],
+    ["what size should i get", "apparel-sizing"],
+  ])("second round: %j → %s", (q, want) => {
+    expect(cites(q)).toBe(want);
+  });
+
   it("drops what the customer says they don't need", () => {
     expect(cites("I don't need to return anything, just want to know when my card is charged")).toBe("payment-methods");
   });
