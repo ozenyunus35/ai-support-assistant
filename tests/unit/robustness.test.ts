@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MAX_MESSAGE, addCustomerMessage, sendAgentReply } from "@/lib/api";
+import { MAX_MESSAGE, addCustomerMessage, assistantRespond, newVisitorConversation, requestHuman, sendAgentReply } from "@/lib/api";
 import { createEngine } from "@/lib/engine";
 import { ARTICLES, SYNONYMS } from "@/lib/kb";
 import { getState } from "@/lib/store";
@@ -100,5 +100,56 @@ describe("message length", () => {
   it("still answers a very long message", () => {
     const q = `${"I have been a customer for years and this is so frustrating. ".repeat(30)} how long do refunds take`;
     expect(["answer", "handoff"]).toContain(ask(q.slice(0, MAX_MESSAGE)).kind);
+  });
+});
+
+describe("while waiting for a person", () => {
+  // The widget keeps its conversation id in localStorage, which Node doesn't have.
+  const memory = new Map<string, string>();
+  globalThis.localStorage ??= {
+    getItem: (k: string) => memory.get(k) ?? null,
+    setItem: (k: string, v: string) => void memory.set(k, v),
+    removeItem: (k: string) => void memory.delete(k),
+    clear: () => memory.clear(),
+    key: (i: number) => [...memory.keys()][i] ?? null,
+    get length() {
+      return memory.size;
+    },
+  };
+
+  it("keeps answering confident questions, stays quiet on unsure ones, and stops once a person replies", () => {
+    newVisitorConversation();
+    const id = addCustomerMessage("hello");
+    requestHuman(id);
+    const conv = () => getState().conversations.find((c) => c.id === id)!;
+    expect(conv().status).toBe("needs-human");
+
+    addCustomerMessage("how long do refunds take");
+    const answer = assistantRespond(id);
+    expect(answer?.answer?.kind).toBe("answer");
+    expect(conv().status).toBe("needs-human");
+
+    const handoffs = conv().messages.filter((m) => m.answer?.kind === "handoff").length;
+    addCustomerMessage("do you sell kayaks");
+    expect(assistantRespond(id)).toBeUndefined();
+    expect(conv().messages.filter((m) => m.answer?.kind === "handoff").length).toBe(handoffs);
+
+    sendAgentReply(id, "Hi, I'm here");
+    addCustomerMessage("how long do refunds take");
+    expect(assistantRespond(id)).toBeUndefined();
+  });
+});
+
+describe("explanations", () => {
+  it("shows the normalised question and the rules that moved the answer", () => {
+    const x = engine.explain("hw do u send my order back pls", { threshold: 0.45 });
+    expect(x.analysis.rephrased).toBe("how do you send back my order please");
+    expect(x.reply.text).toMatch(/northfold\.example\/returns/);
+    expect(x.reply.notes?.join(" ")).toMatch(/How do I/);
+    expect(x.reply.signals).toBeDefined();
+  });
+  it("notes the clear-winner rule when it raises the confidence", () => {
+    const r = ask("got my package but the backpack is missing");
+    expect(r.notes?.some((n) => n.startsWith("Clear winner"))).toBe(true);
   });
 });

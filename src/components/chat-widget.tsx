@@ -213,7 +213,8 @@ export function ChatWidget() {
       const id = addCustomerMessage(text);
       setDraft("");
       if (input.current) input.current.style.height = "auto";
-      if (visitorConversation(getState())?.status !== "open") return;
+      const status = visitorConversation(getState())?.status;
+      if (status !== "open" && status !== "needs-human") return;
       setThinking(true);
       window.setTimeout(() => {
         const m = assistantRespond(id);
@@ -338,10 +339,19 @@ export function ChatWidget() {
               ) : null,
             )}
             {conv?.status === "needs-human" && (
-              <p className="flex items-center justify-center gap-1.5 py-1 text-xs text-muted" role="status">
-                <Clock className="size-3.5" aria-hidden />
-                {settings.replyTime}
-              </p>
+              <div className="space-y-1.5 py-1 text-center text-xs text-muted" role="status">
+                <p className="flex items-center justify-center gap-1.5">
+                  <Clock className="size-3.5" aria-hidden />
+                  {settings.replyTime}. You can keep asking me in the meantime.
+                </p>
+                <p data-testid="demo-agent-hint">
+                  Demo: reply as the team from the{" "}
+                  <a href={`${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/admin/inbox/`} target="_blank" rel="noreferrer" className="font-medium text-accent underline">
+                    admin inbox
+                  </a>
+                  .
+                </p>
+              </div>
             )}
             {thinking && (
               <div className="flex items-center gap-2" role="status" aria-label="Searching the help center">
@@ -383,7 +393,7 @@ export function ChatWidget() {
                     send(draft);
                   }
                 }}
-                placeholder={conv?.status === "needs-human" || conv?.status === "agent" ? "Reply to the Northfold team…" : "Ask a question…"}
+                placeholder={conv?.status === "agent" ? "Reply to the Northfold team…" : conv?.status === "needs-human" ? "Ask another question or add details…" : "Ask a question…"}
                 aria-label="Message"
                 className="max-h-28 flex-1 resize-none bg-transparent py-0.5 text-[13px] leading-5 placeholder:text-faint focus:outline-none"
               />

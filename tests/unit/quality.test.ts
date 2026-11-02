@@ -12,6 +12,7 @@ import { createSeed } from "@/lib/seed";
 import tuning from "./fixtures/tuning-questions.json";
 import tuning2 from "./fixtures/tuning-questions-2.json";
 import holdout from "./fixtures/holdout-questions.json";
+import answerText from "./fixtures/answer-text.json";
 import holdout2 from "./fixtures/holdout-questions-2.json";
 import { randomQuestions } from "./fixtures/random-questions";
 import { randomQuestions2 } from "./fixtures/random-questions-2";
@@ -61,6 +62,14 @@ describe("answer quality", () => {
     const s = score(randomQuestions2(3000, seed));
     expect(s.right).toBeGreaterThanOrEqual(0.6);
     expect(s.wrong).toBeLessThanOrEqual(0.055);
+  });
+
+  it("answers state the fact that was asked for (33/35 measured; 26/35 before)", () => {
+    const missing = (answerText as Array<[string, string]>).filter(([q, fact]) => {
+      const r = engine.answer(q, opts);
+      return r.kind !== "answer" || !new RegExp(fact, "i").test(r.text);
+    });
+    expect(missing.length, missing.map(([q]) => q).join("; ")).toBeLessThanOrEqual(3);
   });
 
   it("never answers off-topic random questions from an article", () => {

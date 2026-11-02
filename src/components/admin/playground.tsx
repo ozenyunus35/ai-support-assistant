@@ -7,7 +7,7 @@ import { engineFor, useStore } from "@/lib/store";
 import { RichText } from "../rich-text";
 import { Card, CardHeader, EmptyState, PageHeader, Spinner, cx, inputClass } from "../ui";
 
-const EXAMPLES = ["can i get my money back if the tent is used", "refnd for a retrun", "my zipper broke", "do you sell kayaks?", "Where is my order NF-20517?", "how much is express shipping"];
+const EXAMPLES = ["can i get my money back if the tent is used", "refnd for a retrun", "my zipper broke", "do you sell kayaks?", "Where is my order NF-20517?", "how much is express shipping", "hw do u send my order back pls"];
 
 function Chip({ children, tone = "neutral" }: { children: React.ReactNode; tone?: "neutral" | "accent" | "muted" }) {
   return <span className={cx("inline-flex h-5 items-center rounded border px-1.5 font-mono text-[11px]", tone === "accent" ? "border-accent/40 bg-accent-soft text-text" : tone === "muted" ? "border-border text-faint line-through" : "border-border text-muted")}>{children}</span>;
@@ -31,6 +31,9 @@ export function Playground() {
   if (!state) return <Spinner />;
   const threshold = state.settings.threshold;
   const top = x?.hits[0]?.score ?? 1;
+  const conf = x ? x.reply.confidence : 0;
+  const sig = x?.reply.signals;
+  const used = x?.reply.citations[0];
   const decision = !x ? "" : x.reply.kind === "answer" ? "Answer" : x.reply.kind === "handoff" ? "Hand off to a person" : x.reply.kind === "order" ? "Look up the order" : x.reply.kind === "clarify" ? "Ask a follow-up question" : "Small talk";
 
   return (
@@ -60,10 +63,13 @@ export function Playground() {
             <Card>
               <CardHeader title="1 · Understand the question" />
               <ol className="space-y-4 p-4">
-                <Step n={1} title="Drop filler words">
+                <Step n={1} title="Normalise phrasing">
+                  {x.analysis.rephrased ? <span className="text-xs text-text" data-testid="rephrased">{x.analysis.rephrased}</span> : <span className="text-xs text-faint">Nothing to rewrite</span>}
+                </Step>
+                <Step n={2} title="Drop filler words">
                   {x.analysis.dropped.length ? x.analysis.dropped.map((w, i) => <Chip key={w + i} tone="muted">{w}</Chip>) : <span className="text-xs text-faint">Nothing to drop</span>}
                 </Step>
-                <Step n={2} title="Fix spelling">
+                <Step n={3} title="Fix spelling">
                   {x.analysis.corrections.length ? (
                     x.analysis.corrections.map((c) => (
                       <span key={c.from} className="inline-flex items-center gap-1">
@@ -76,7 +82,7 @@ export function Playground() {
                     <span className="text-xs text-faint">No typos found</span>
                   )}
                 </Step>
-                <Step n={3} title="Map customer wording">
+                <Step n={4} title="Map customer wording">
                   {x.analysis.synonyms.length ? (
                     x.analysis.synonyms.map((c) => (
                       <span key={c.from} className="inline-flex items-center gap-1">
@@ -89,7 +95,7 @@ export function Playground() {
                     <span className="text-xs text-faint">No synonyms used</span>
                   )}
                 </Step>
-                <Step n={4} title="Search terms">
+                <Step n={5} title="Search terms">
                   {x.analysis.terms.length ? [...new Set(x.analysis.terms)].map((t) => <Chip key={t} tone="accent">{t.replace(/_/g, " ")}</Chip>) : <span className="text-xs text-faint">No search terms left</span>}
                 </Step>
               </ol>
@@ -99,30 +105,58 @@ export function Playground() {
               <CardHeader title="3 · Decide" />
               <div className="p-4">
                 <div className="flex items-baseline justify-between">
-                  <p className="text-[28px] leading-none font-semibold tracking-[-0.02em] tabular-nums" aria-label={`Confidence ${pct(x.confidence)}`}>
-                    {pct(x.confidence)}
+                  <p className="text-[28px] leading-none font-semibold tracking-[-0.02em] tabular-nums" aria-label={`Confidence ${pct(conf)}`}>
+                    {pct(conf)}
                   </p>
                   <p className={cx("font-medium", x.reply.kind === "handoff" ? "text-warning" : "text-success")} data-testid="decision">
                     {decision}
                   </p>
                 </div>
                 <div className="relative mt-3 h-1.5 rounded-full bg-surface-3">
-                  <div className={cx("h-full rounded-full transition-[width] duration-300", x.confidence < threshold ? "bg-warning" : "bg-accent")} style={{ width: pct(x.confidence) }} />
+                  <div className={cx("h-full rounded-full transition-[width] duration-300", conf < threshold ? "bg-warning" : "bg-accent")} style={{ width: pct(conf) }} />
                   <span className="absolute -top-1 h-3.5 w-px bg-text" style={{ left: pct(threshold) }} aria-hidden />
                 </div>
                 <p className="mt-1.5 text-xs text-faint">Handoff threshold {pct(threshold)} (change it in Settings)</p>
                 <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-border pt-3 text-xs">
                   <div>
                     <dt className="text-muted">Coverage</dt>
-                    <dd className="mt-0.5 font-medium tabular-nums">{pct(x.coverage)}</dd>
+                    <dd className="mt-0.5 font-medium tabular-nums">{pct(sig?.coverage ?? x.coverage)}</dd>
                     <dd className="text-faint">of the question the best article talks about</dd>
                   </div>
                   <div>
                     <dt className="text-muted">Match strength</dt>
-                    <dd className="mt-0.5 font-medium tabular-nums">{pct(x.strength)}</dd>
+                    <dd className="mt-0.5 font-medium tabular-nums">{pct(sig?.strength ?? x.strength)}</dd>
                     <dd className="text-faint">BM25 score of the best section, scaled</dd>
                   </div>
+                  {sig && (
+                    <>
+                      <div>
+                        <dt className="text-muted">Lead</dt>
+                        <dd className="mt-0.5 font-medium tabular-nums">{Math.exp(sig.margin).toFixed(1)}×</dd>
+                        <dd className="text-faint">score of the next best article</dd>
+                      </div>
+                      <div>
+                        <dt className="text-muted">Intent</dt>
+                        <dd className="mt-0.5 font-medium">{sig.intent > 0 ? "Matched" : sig.intent < 0 ? "Missed" : "None stated"}</dd>
+                        <dd className="text-faint">{pct(sig.unknown)} of words not in the help center</dd>
+                      </div>
+                    </>
+                  )}
                 </dl>
+                <div className="mt-3 border-t border-border pt-3 text-xs" data-testid="rules">
+                  <p className="text-muted">Rules applied</p>
+                  {x.reply.notes?.length ? (
+                    <ul className="mt-1.5 space-y-1">
+                      {x.reply.notes.map((n) => (
+                        <li key={n} className="text-text">
+                          {n}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="mt-1 text-faint">None, the top section and its score were used as they are.</p>
+                  )}
+                </div>
               </div>
             </Card>
           </div>
@@ -142,6 +176,11 @@ export function Playground() {
                           <span className="font-medium">{h.title}</span>
                           {h.heading && <span className="text-muted"> › {h.heading}</span>}
                         </p>
+                        {used && used.articleId === h.articleId && (used.heading ?? null) === (h.heading ?? null) && (
+                          <span className="shrink-0 rounded-full bg-accent/15 px-1.5 text-[11px] font-medium text-accent" data-testid="used-section">
+                            {x.reply.kind === "answer" ? "Used" : "Closest"}
+                          </span>
+                        )}
                         <span className="shrink-0 font-mono text-xs text-muted tabular-nums">{h.score.toFixed(2)}</span>
                       </div>
                       <div className="mt-1.5 ml-6 h-1 overflow-hidden rounded-full bg-surface-3">

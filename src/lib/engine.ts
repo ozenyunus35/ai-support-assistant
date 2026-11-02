@@ -64,6 +64,9 @@ function rephrase(text: string) {
   return text
     .replace(/[\p{L}']+/gu, (w) => SHORTHAND[w.toLowerCase()] ?? w)
     .replace(/\b(send|give|take|bring|mail|post)\s+((?:[\p{L}'-]+\s+){1,3}?)back\b/giu, "$1 back $2")
+    .replace(/\b(?:support|customer service|helpline|help line)\s+(?:phone(?: number)?|number|line)\b|\bphone(?: number)?\s+(?:for|of)\s+(?:support|customer service)\b|\bcall (?:you|support|customer service)\b|\byour phone(?: number)?\b/giu, "contact phone")
+    // "Shipping rates" are prices; "rate" would otherwise share a stem with sleeping bag "ratings".
+    .replace(/\brates?\b/giu, "prices")
     // "What's your email?" asks for ours; "change my email" is about the account.
     .replace(/\byour e-?mail(?: address)?\b/giu, "support email")
     .replace(/\b(arrived|came|showed up|was delivered|got here)\s+(?:(?:all|completely|totally|already)\s+)?(broken|broke|damaged|cracked|smashed|dented|torn|ripped|bent|crushed|snapped|scratched|leaking)\b/giu, "arrived damaged")
@@ -91,11 +94,14 @@ const THANKS = /\b(thanks|thank you|thx|cheers|perfect|awesome|great|got it|that
 /** Word stems that may appear in a plain "thanks" message without making it a question. */
 const THANKS_TERMS = new Set(["great", "perfect", "awesom", "helpful", "help", "good", "nic", "cool", "brilliant", "wonderful", "appreciat", "lovely"]);
 const IDENTITY = /\b(who|what) are you\b|\bare you (a |an )?(bot|robot|human|real|ai|person)\b|\byour name\b/i;
-const HOW_TO = /^\s*(how (do|can|should|would) (i|we)|how to)\b/i;
+const HOW_TO = /^\s*(how (do|can|should|would) (i|we|you)|how to)\b/i;
 const PRICE = /\b(price|prices|cost|costs|how much)\b/i;
 const POLICY_WORDS = /\b(ship|shipping|deliver|delivery|return|refund|exchange|fee|fees|membership|club|rent|rental|repair|warranty|label|duties|tax|klarna|gift card|went down|gone down|dropped|drop|adjustment|difference)\b/i;
 const SHIP_WORDS = /\b(ship|ships|shipping|deliver|delivers|delivery|send|post)\b/i;
 // Letters and words that only show up when someone writes in another language.
+/** A money amount in a help center section: "$6.95", "€19". */
+const AMOUNT = /[$€£]\s?\d/;
+
 /** Confidence given to a clear winner; a stricter threshold set by the team still hands these off. */
 const CLEAR_WINNER = 0.5;
 /** A section matching the customer's intent wins when it scores at least this share of the best one. */
@@ -181,6 +187,8 @@ export interface Analysis {
   corrections: Rewrite[];
   synonyms: Rewrite[];
   dropped: string[];
+  /** The question after shorthand and split phrases were normalised, when that changed it. */
+  rephrased?: string;
 }
 
 interface Phrase {
@@ -216,6 +224,8 @@ export interface Reply {
   order?: OrderCard;
   /** What the confidence was computed from, for the retrieval details view. */
   signals?: Signals;
+  /** Rules that changed the ranking or the confidence, in order, for the playground. */
+  notes?: string[];
 }
 
 /** Per-question signals about the best article; confidence is a fitted function of these. */
@@ -303,7 +313,9 @@ export function createEngine(articles: Article[], synonymGroups: SynonymGroup[])
 
   function analyse(text: string, correct: boolean): Analysis {
     // Questions only: drop what the customer says they don't mean.
-    const raw = words(correct ? rephrase(fold(text).replace(NEGATION, " ")) : text);
+    const negated = correct ? fold(text).replace(NEGATION, " ") : text;
+    const normal = correct ? rephrase(negated) : text;
+    const raw = words(normal);
     const corrections: Rewrite[] = [];
     let seq = raw.map((w) => ({ w, s: stem(w), stop: STOP.has(w) || (correct && FILLER.has(w)) }));
     if (correct) {
@@ -369,11 +381,12 @@ export function createEngine(articles: Article[], synonymGroups: SynonymGroup[])
       }
       i++;
     }
-    return { terms, surface, corrections, synonyms, dropped };
+    return { terms, surface, corrections, synonyms, dropped, rephrased: correct && normal !== negated ? normal.replace(/\s+/g, " ").trim() : undefined };
   }
 
   const chunks: Chunk[] = [];
   const df = new Map<string, number>();
+  const PRICE_TERM = analyse("price", false).terms[0];
   for (const article of articles) {
     const titleTerms = analyse(article.title, false).terms;
     for (const sec of sections(article.body)) {
@@ -382,6 +395,8 @@ export function createEngine(articles: Article[], synonymGroups: SynonymGroup[])
       add(titleTerms, TITLE_WEIGHT);
       if (sec.heading) add(analyse(sec.heading, false).terms, HEADING_WEIGHT);
       add(analyse(sec.text, false).terms, 1);
+      // A section that states amounts answers "how much": it counts as mentioning a price.
+      if (AMOUNT.test(sec.text)) add([PRICE_TERM], 1);
       let len = 0;
       tf.forEach((v) => (len += v));
       chunks.push({ id: chunks.length, article, heading: sec.heading, text: sec.text, tf, len });
@@ -397,6 +412,8 @@ export function createEngine(articles: Article[], synonymGroups: SynonymGroup[])
   }
   // Words in a section's article title and heading: what the section is named after.
   const nameTerms = new Map(chunks.map((c) => [c.id, new Set(analyse(`${c.article.title} ${c.heading ?? ""}`, false).terms)]));
+  const titleTerms = new Map(articles.map((a) => [a.id, new Set(analyse(a.title, false).terms)]));
+  const titleTermsOf = (a: Article) => titleTerms.get(a.id)!;
   const N = Math.max(1, chunks.length);
   const avgLen = chunks.reduce((s, c) => s + c.len, 0) / N || 1;
   const idf = (t: string) => {
@@ -624,42 +641,58 @@ export function createEngine(articles: Article[], synonymGroups: SynonymGroup[])
       };
     }
 
+    // Each rule below may move a close section to the top; what it did is kept for the playground.
+    const notes: string[] = [];
+    // Shorthand expanded ("hw do u…" → "how do you…") so the question-shape rules see it.
+    const asked = analysis.rephrased ?? question;
+    const where = (r: (typeof ranked)[number]) => r.c.article.title + (r.c.heading ? ` › ${r.c.heading}` : "");
+    const promote = (i: number, why: string) => {
+      notes.push(`${why}: ${where(ranked[i])} moved above ${where(ranked[0])}`);
+      ranked = [ranked[i], ...ranked.filter((_, j) => j !== i)];
+      confidence = confidenceOf(analysis.terms, ranked[0]).confidence;
+    };
+
     // "How do I return…" wants the step-by-step article when it is a close match.
-    if (HOW_TO.test(question) && ranked[0] && !ranked[0].c.article.title.startsWith("How to")) {
+    if (HOW_TO.test(asked) && ranked[0] && !ranked[0].c.article.title.startsWith("How to")) {
       const howTo = ranked.findIndex((r) => r.c.article.title.startsWith("How to") && r.score >= ranked[0].score * 0.45);
-      if (howTo > 0) {
-        ranked = [ranked[howTo], ...ranked.filter((_, i) => i !== howTo)];
-        confidence = confidenceOf(analysis.terms, ranked[0]).confidence;
-      }
+      if (howTo > 0) promote(howTo, "“How do I…” question");
     }
 
     // "Is shipping free?" means the US unless the question names a country or says international.
     if (ranked[0]?.c.article.id === "international-shipping" && !yes && !no && !content.some((t) => ["international", "duti"].includes(t))) {
       const domestic = ranked.findIndex((r) => r.c.article.id === "shipping-times" && r.score >= ranked[0].score * 0.5);
-      if (domestic > 0) {
-        ranked = [ranked[domestic], ...ranked.filter((_, i) => i !== domestic)];
-        confidence = confidenceOf(analysis.terms, ranked[0]).confidence;
-      }
+      if (domestic > 0) promote(domestic, "No country named, so US shipping");
     }
 
     // The customer's intent ("repair", "return", "cancel") outweighs a rarer side word ("down" in
     // "patch a hole in my down jacket"): prefer a close section that matches the intent.
     const intents = content.filter((t) => INTENT.has(t));
-    const promote = (i: number) => {
-      ranked = [ranked[i], ...ranked.filter((_, j) => j !== i)];
-      confidence = confidenceOf(analysis.terms, ranked[0]).confidence;
-    };
+    const said = intents.map((t) => `“${analysis.surface[t] ?? t}”`).join(", ");
     if (intents.length && ranked[0] && !ranked[0].matched.some((t) => intents.includes(t))) {
       const byIntent = ranked.findIndex((r) => r.matched.some((t) => intents.includes(t)) && r.score >= ranked[0].score * NAMED_RATIO);
-      if (byIntent > 0) promote(byIntent);
+      if (byIntent > 0) promote(byIntent, `Intent ${said}`);
     }
     // A section named after the intent ("Exchanges…", "Where is my refund?") beats one that only mentions
     // it, unless that one matches clearly more of the question ("money back for a used tent" is about used gear).
     const named = (r: (typeof ranked)[number]) => intents.some((t) => nameTerms.get(r.c.id)!.has(t));
     if (intents.length && ranked[0] && !named(ranked[0])) {
-      const top = ranked[0];
-      const i = ranked.findIndex((r) => named(r) && r.score >= top.score * NAMED_RATIO && new Set(r.matched).size >= new Set(top.matched).size - 1);
-      if (i > 0) promote(i);
+      const first = ranked[0];
+      const i = ranked.findIndex((r) => named(r) && r.score >= first.score * NAMED_RATIO && new Set(r.matched).size >= new Set(first.matched).size - 1);
+      if (i > 0) promote(i, `Section named after ${said}`);
+    }
+
+    // "How much…" wants the section of the best article that states an amount, when it scores close.
+    if (content.includes(PRICE_TERM) && ranked[0] && !AMOUNT.test(ranked[0].c.text)) {
+      const priced = ranked.findIndex((r) => r.c.article.id === ranked[0].c.article.id && AMOUNT.test(r.c.text) && r.score >= ranked[0].score * 0.8);
+      if (priced > 0) promote(priced, "Price question, so the section with amounts");
+    }
+
+    // "How do I…" wants the steps in the article's opening section, unless it asks about one of the
+    // article's specific cases ("return in store", "return a gift").
+    if (HOW_TO.test(asked) && ranked[0]?.c.heading) {
+      const lead = ranked.findIndex((r) => r.c.article.id === ranked[0].c.article.id && !r.c.heading && r.score >= ranked[0].score * 0.6);
+      const own = [...nameTerms.get(ranked[0].c.id)!].filter((t) => !titleTermsOf(ranked[0].c.article).has(t));
+      if (lead > 0 && !own.some((t) => content.includes(t))) promote(lead, "“How do I…” wants the steps");
     }
 
     const top = ranked[0];
@@ -667,22 +700,24 @@ export function createEngine(articles: Article[], synonymGroups: SynonymGroup[])
     if (!top || (confidence < 0.12 && !top.matched.length))
       return { ...base, kind: "clarify", confidence, text: "I'm not sure I understood. I can help with orders, shipping, returns, sizing and warranty. Try “How do I start a return?”, or type “talk to a person”." };
     // A clear winner: the best article matches strongly, covers a good part of the question and
-    // scores well above any other article. Words the help center never uses ("stuck", "half")
-    // then shouldn't be enough to hand off on their own.
-    // A weaker match also counts when it is at least twice as strong as any other article and
-    // doesn't miss the intent the customer stated.
+    // scores well above any other article, so a few words the help center never uses ("stuck", "half")
+    // aren't enough to hand off. A weaker match also counts when it is at least twice as strong as any
+    // other article and doesn't miss the intent the customer stated.
     const signals = signalsOf(analysis.terms, ranked);
     if (confidence < opts.threshold) {
       const { coverage, strength, margin, intent } = signals;
       const clear = (strength >= 0.5 && coverage >= 0.4 && margin >= Math.log(1.5)) || (strength >= 0.4 && coverage >= 0.3 && margin >= Math.log(2) && intent >= 0);
-      if (clear) confidence = Math.max(confidence, CLEAR_WINNER);
+      if (clear) {
+        notes.push(`Clear winner: ${Math.exp(margin).toFixed(1)}× the score of the next article, confidence raised to ${Math.round(CLEAR_WINNER * 100)}%`);
+        confidence = Math.max(confidence, CLEAR_WINNER);
+      }
     }
-    if (confidence < opts.threshold) return { ...base, kind: "handoff", confidence, handoff: true, text: "", citations: [cite(top.c)], signals };
+    if (confidence < opts.threshold) return { ...base, kind: "handoff", confidence, handoff: true, text: "", citations: [cite(top.c)], signals, notes };
 
     const citations = [cite(top.c)];
     const second = ranked.find((r) => r.c.article.id !== top.c.article.id);
     if (second && second.score >= top.score * 0.75) citations.push(cite(second.c));
-    return { ...base, kind: "answer", confidence, text: compose(top.c, analysis.terms), citations, matched: top.matched.map((t) => analysis.surface[t] ?? t), signals };
+    return { ...base, kind: "answer", confidence, text: compose(top.c, analysis.terms), citations, matched: top.matched.map((t) => analysis.surface[t] ?? t), signals, notes };
   }
 
   return { analyse, search, searchArticles, answer, explain, chunkCount: chunks.length };

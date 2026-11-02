@@ -26,7 +26,8 @@ handoff queue, the knowledge base and how well the assistant is doing.
 **Chat widget**
 - Answers built from the best matching help center section, with linked sources that open the article at the cited section.
 - Confidence threshold: below it, the chat goes to a person with a clear message and the expected reply time.
-- "Talk to a person" at any time, thumbs up/down on every answer, a new-conversation button.
+- "Talk to a person" at any time, thumbs up/down on every answer, a new-conversation button. While a chat waits
+  for the team, the assistant still answers what it is sure about.
 - Order lookup: asks for the order number and shows a status card (packed, shipped, out for delivery, delivered).
 - Understands customer wording (synonyms such as *money back* → *refund*) and fixes small typos.
 - Optional retrieval details under each answer: confidence and the words that matched.
@@ -41,8 +42,9 @@ handoff queue, the knowledge base and how well the assistant is doing.
   confidence and sources of every AI answer, customer feedback, replies and resolve. Waiting chats come first.
 - Agent assist: a suggested reply from the closest article, even when the assistant was too unsure to send it.
 - Knowledge base: article editor with live preview, categories, synonym groups. Changes are re-indexed instantly.
-- Answer playground: type a question and see every step, from word normalisation and BM25 ranking to the
-  confidence score and the reply.
+- Answer playground: type a question and see every step, from shorthand and phrase normalisation, typo fixes and
+  BM25 ranking to the rules that moved a section up, the signals behind the confidence (coverage, match strength,
+  lead over the next article, intent) and the reply.
 - Settings: greeting, suggested questions, handoff message and a threshold slider that shows how many of the last
   30 days' answers would have gone to a person at that setting.
 
@@ -91,6 +93,8 @@ npm test             # unit tests (Vitest)
 npm run build        # static export in out/
 ```
 
+Screenshots in `docs/` come from `node scripts/screenshots.mjs` against the same build.
+
 End-to-end tests run against the static build, served under `/ai-support-assistant/` like on GitHub Pages:
 
 ```bash
@@ -127,6 +131,10 @@ BASE_URL=https://ozenyunus35.github.io/ai-support-assistant/ npm run test:e2e   
   was used to check each change, the other seeds and the holdout only for the final numbers. A first holdout
   showed the first round had overfit its tuning questions (it moved only 57% → 58%), so it was turned into a
   tuning set and the approach changed to general rules.
+
+  [`tests/unit/fixtures/answer-text.json`](tests/unit/fixtures/answer-text.json) also checks that the reply states
+  the fact that was asked for (a price, a time limit, a link), not just that it cites the right article:
+  33 of 35 now, 26 before.
 
   The rest are handed to a person, which is the safe failure for a support assistant.
 

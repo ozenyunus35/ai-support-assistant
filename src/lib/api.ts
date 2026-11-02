@@ -51,8 +51,11 @@ export function addCustomerMessage(raw: string): string {
   return id!;
 }
 
-/** True when the conversation waits for the assistant, i.e. a person hasn't taken it over. */
-export const assistantActive = (c: Conversation) => c.status === "open";
+/**
+ * True while no person has taken the conversation over. While it waits in the queue the assistant
+ * still answers what it is sure about, so one off-topic question doesn't leave the customer stuck.
+ */
+export const assistantActive = (c: Conversation) => c.status === "open" || c.status === "needs-human";
 
 /** Lets the assistant answer the latest customer message. */
 export function assistantRespond(conversationId: string): Message | undefined {
@@ -62,6 +65,8 @@ export function assistantRespond(conversationId: string): Message | undefined {
   if (!conv || !last || last.role !== "customer" || !assistantActive(conv)) return undefined;
   const engine = engineFor(state);
   const r = engine.answer(last.text, { threshold: state.settings.threshold, orders: state.orders });
+  // Already queued for a person: unsure questions wait for them instead of a second handoff message.
+  if (conv.status === "needs-human" && r.handoff) return undefined;
   const message: Message = {
     id: uid("m"),
     role: "assistant",

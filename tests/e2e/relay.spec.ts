@@ -289,3 +289,23 @@ test("full or blocked storage shows a warning and the demo keeps working", async
   await page.goto("./admin/");
   await expect(page.getByRole("alert").filter({ hasText: "can't save the demo" })).toBeVisible();
 });
+
+test("after a handoff the assistant still answers what it knows, and points to the inbox", async ({ page }) => {
+  await page.goto("./");
+  const panel = await ask(page, "do you sell kayaks");
+  await expect(panel.getByText("Waiting for a teammate")).toBeVisible();
+  await expect(panel.getByTestId("demo-agent-hint").getByRole("link", { name: "admin inbox" })).toHaveAttribute("href", /\/admin\/inbox\/$/);
+  await panel.getByRole("textbox", { name: "Message" }).fill("how long do refunds take");
+  await panel.getByRole("textbox", { name: "Message" }).press("Enter");
+  await expect(panel.getByText("PayPal: within 24 hours.")).toBeVisible();
+});
+
+test("playground explains shorthand and the rules it applied", async ({ page }) => {
+  await page.goto("./admin/playground/");
+  await page.getByLabel("Customer question").fill("hw do u send my order back pls");
+  await expect(page.getByTestId("rephrased")).toHaveText("how do you send back my order please");
+  await expect(page.getByTestId("rules")).toContainText("How do I");
+  await expect(page.getByTestId("used-section").locator("xpath=..")).toContainText("How to start a return");
+  await expect(page.getByTestId("used-section").locator("xpath=..")).not.toContainText("Returning in store");
+  await expect(page.getByText(/northfold\.example\/returns/).first()).toBeVisible();
+});
