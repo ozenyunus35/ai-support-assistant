@@ -242,3 +242,50 @@ test("phone layout: full-screen chat and drawer navigation", async ({ page }) =>
   await nav(page, "Inbox");
   await noHorizontalScroll(page);
 });
+
+test("a link to a removed article explains it instead of showing the home page", async ({ page }) => {
+  await page.goto("./#/an-article-that-was-deleted/some-section");
+  await expect(page.getByRole("heading", { level: 1, name: "This article isn't available" })).toBeVisible();
+  await page.getByRole("link", { name: "Where is my refund?" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Where is my refund?" })).toBeVisible();
+  await page.goto("./#/an-article-that-was-deleted");
+  await page.getByRole("link", { name: "Back to the help center" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "How can we help?" })).toBeVisible();
+  await noHorizontalScroll(page);
+});
+
+test("long messages stop at 2000 characters and still get a reply", async ({ page }) => {
+  await page.goto("./");
+  const panel = await openWidget(page);
+  const box = panel.getByRole("textbox", { name: "Message" });
+  await box.fill(`${"I have been waiting for ages and I am really not happy about it. ".repeat(40)}how long do refunds take`);
+  expect((await box.inputValue()).length).toBe(2000);
+  await expect(panel.getByText("2000/2000")).toBeVisible();
+  await box.press("Enter");
+  await expect(panel.getByRole("textbox", { name: "Message" })).toHaveValue("");
+  await expect(panel.getByText(/Searching \d+ help articles/)).toBeHidden({ timeout: 10_000 });
+});
+
+test("a US state is answered from the domestic shipping article", async ({ page }) => {
+  await page.goto("./");
+  const panel = await ask(page, "how long does delivery take to california");
+  await expect(panel.getByText(/we ship everywhere in the United States/)).toBeVisible();
+  await expect(panel.getByRole("link", { name: /Shipping times and costs/ })).toBeVisible();
+});
+
+test("full or blocked storage shows a warning and the demo keeps working", async ({ page }) => {
+  await page.addInitScript(() => {
+    const set = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (key: string, value: string) {
+      if (key === "relay:state") throw new DOMException("The quota has been exceeded.", "QuotaExceededError");
+      return set.call(this, key, value);
+    };
+  });
+  await page.goto("./");
+  const alert = page.getByRole("alert").filter({ hasText: "can't save the demo" });
+  await expect(alert).toBeVisible();
+  const panel = await ask(page, "how long do refunds take");
+  await expect(panel.getByText("PayPal: within 24 hours.")).toBeVisible();
+  await page.goto("./admin/");
+  await expect(page.getByRole("alert").filter({ hasText: "can't save the demo" })).toBeVisible();
+});

@@ -1,3 +1,4 @@
+import { REAL_WORDS } from "./dictionary";
 import type { AnswerKind, Article, Citation, Order, OrderCard, SynonymGroup } from "./types";
 
 /**
@@ -20,6 +21,53 @@ const STOP = new Set(
   still ever anyone something anything way go going make sure youre many lot old says`.split(/\s+/),
 );
 
+/**
+ * Words that carry mood, urgency or small talk but not what the question is about
+ * ("asap", "honestly", "third time I ask"). They are dropped like stop words, so a
+ * frustrated, wordy message finds the same article as a short one.
+ */
+const FILLER = new Set(
+  `asap urgent urgently quickly soon honestly seriously literally basically actually really totally super so very
+  disappointed frustrated annoyed angry upset unhappy sad mad furious confused worried sorry please pls plz kindly
+  guys hey hiya hi there folks team nah yeah yep nope ugh omg lol hmm well also again already just only even
+  third second first time times ask asked asking tried trying wonder wondering curious quick wanted hoping hope
+  week weeks day days today yesterday tomorrow monday tuesday wednesday thursday friday ago last
+  came come comes went thing things stuff bit little bought purchased ordered got received
+  red blue green black white grey gray yellow orange purple pink brown navy`.split(/\s+/),
+);
+
+/**
+ * Words that are common across the help center and say little about which article
+ * fits ("how long does it take", "find", "use", the product itself). They still count,
+ * at a lower weight, so the customer's intent (return, refund, exchange) decides.
+ */
+const GENERIC = new Map<string, number>(
+  `long tak find use check new good back item order product gear mean run work need know way kind jacket tent boot bag backpack sleep thing wait`
+    .split(/\s+/)
+    .map((w) => [w, 0.4]),
+);
+/** What the customer wants done weighs more than what it is about: "return my online order at a store" is about returning. */
+const INTENT = new Set(["chang", "return", "refund", "exchang", "cancel", "track", "repair", "warranty", "damag", "miss", "not_receiv", "trad_in", "rent", "restock", "contact"]);
+const weightOf = (t: string) => GENERIC.get(t) ?? (INTENT.has(t) ? 1.5 : 1);
+
+/**
+ * Phrases customers split around other words: "send my order back" is "send back",
+ * "the tent came broken" is "arrived damaged" (not a warranty claim), "your email" is the support email.
+ */
+function rephrase(text: string) {
+  return text
+    .replace(/\b(send|give|take|bring|mail|post)\s+((?:[\p{L}'-]+\s+){1,3}?)back\b/giu, "$1 back $2")
+    // "What's your email?" asks for ours; "change my email" is about the account.
+    .replace(/\byour e-?mail(?: address)?\b/giu, "support email")
+    .replace(/\b(arrived|came|showed up|was delivered|got here)\s+(?:(?:all|completely|totally|already)\s+)?(broken|broke|damaged|cracked|smashed|dented|torn|ripped|bent|crushed)\b/giu, "arrived damaged");
+}
+
+/** "not the return policy", "I don't want a refund": the words right after are what the customer doesn't mean. */
+const NEGATION = /\b(?:not (?:the|a|an|about|for)|(?:don'?t|do not|no) (?:want|need|have)(?: to| a| an| the)?|instead of|rather than|other than)\s+((?:[\p{L}\d'-]+\s*){1,3})/giu;
+
+/** Questions about things a store's help center doesn't cover, answered without guessing. */
+const JOBS = /\b(hiring|jobs?|careers?|vacanc(y|ies)|internships?|employment|work (for|at) (you|northfold))\b/i;
+
 const GREETING = /^(hi|hello|hey|hiya|good (morning|afternoon|evening)|yo)\b/i;
 const THANKS = /\b(thanks|thank you|thx|cheers|perfect|awesome|great|got it|that helps|helpful)\b/i;
 /** Word stems that may appear in a plain "thanks" message without making it a question. */
@@ -27,14 +75,21 @@ const THANKS_TERMS = new Set(["great", "perfect", "awesom", "helpful", "help", "
 const IDENTITY = /\b(who|what) are you\b|\bare you (a |an )?(bot|robot|human|real|ai|person)\b|\byour name\b/i;
 const HOW_TO = /^\s*(how (do|can|should|would) (i|we)|how to)\b/i;
 const PRICE = /\b(price|prices|cost|costs|how much)\b/i;
-const POLICY_WORDS = /\b(ship|shipping|deliver|delivery|return|refund|exchange|fee|fees|membership|club|rent|rental|repair|warranty|label|duties|tax|klarna|gift card)\b/i;
+const POLICY_WORDS = /\b(ship|shipping|deliver|delivery|return|refund|exchange|fee|fees|membership|club|rent|rental|repair|warranty|label|duties|tax|klarna|gift card|went down|gone down|dropped|drop|adjustment|difference)\b/i;
 const SHIP_WORDS = /\b(ship|ships|shipping|deliver|delivers|delivery|send|post)\b/i;
 // Letters and words that only show up when someone writes in another language.
+/** Confidence given to a clear winner; a stricter threshold set by the team still hands these off. */
+const CLEAR_WINNER = 0.5;
+
+/** Weather forecasts: nothing in the help center can answer them, however much they mention rain or snow. */
+const WEATHER = /\b(weather|forecast|will it (rain|snow)|is it (going to )?(rain|snow)|(rain|snow)(ing)? (today|tomorrow|tonight|this weekend))\b/i;
 const OTHER_LANGUAGE = /[ığşİĞŞñ¿¡ßœ]|\b(nasıl|neden|nerede|kargo|sipariş|iade|merhaba|cómo|dónde|envío|pedido|hola|wie|wo|bestellung|versand|rückgabe|hallo|bonjour|commande|livraison|où|olá|encomenda)\b/i;
 
 /** Countries the help center lists in "International shipping", plus the US itself. */
 const SHIPS_TO = ["united states", "usa", "us", "america", "canada", "united kingdom", "uk", "britain", "england", "scotland", "wales", "norway", "switzerland", "australia", "new zealand", "singapore", "japan", "united arab emirates", "uae", "dubai",
   "germany", "france", "spain", "italy", "netherlands", "holland", "belgium", "austria", "ireland", "portugal", "poland", "sweden", "denmark", "finland", "greece", "czechia", "czech republic", "hungary", "romania", "bulgaria", "croatia", "slovakia", "slovenia", "estonia", "latvia", "lithuania", "luxembourg", "malta", "cyprus"];
+/** US states: "delivery to California" is a domestic shipping question. */
+const US_STATES = ["alabama", "alaska", "arizona", "arkansas", "california", "colorado", "connecticut", "delaware", "florida", "georgia", "hawaii", "idaho", "illinois", "indiana", "iowa", "kansas", "kentucky", "louisiana", "maine", "maryland", "massachusetts", "michigan", "minnesota", "mississippi", "missouri", "montana", "nebraska", "nevada", "new hampshire", "new jersey", "new mexico", "new york", "north carolina", "north dakota", "ohio", "oklahoma", "oregon", "pennsylvania", "rhode island", "south carolina", "south dakota", "tennessee", "texas", "utah", "vermont", "virginia", "washington", "west virginia", "wisconsin", "wyoming", "puerto rico"];
 const NOT_YET = ["turkey", "türkiye", "turkiye", "mexico", "brazil", "argentina", "chile", "colombia", "peru", "india", "pakistan", "bangladesh", "china", "hong kong", "taiwan", "south korea", "korea", "indonesia", "malaysia", "thailand", "vietnam", "philippines", "russia", "ukraine", "israel", "saudi arabia", "qatar", "kuwait", "egypt", "morocco", "nigeria", "kenya", "south africa", "iceland", "serbia"];
 const titleCase = (c: string) => (c.length <= 3 ? c.toUpperCase() : c.replace(/\b\p{L}/gu, (m) => m.toUpperCase()));
 
@@ -49,10 +104,15 @@ export const fold = (s: string) =>
     .toLowerCase()
     .replace(/['’]/g, "");
 
-export const words = (s: string) => fold(s).split(/[^a-z0-9]+/).filter(Boolean);
+// "Pre-order", "e-mail" and "trade-in" read the same as "preorder", "email" and "tradein".
+export const words = (s: string) => fold(s).replace(/([a-z])-(?=[a-z])/g, "$1").split(/[^a-z0-9]+/).filter(Boolean);
 
 /** A deliberately small suffix stripper: enough to match plurals and verb forms. */
+/** Irregular verb forms customers use a lot: "you sent me", "I wore them", "it broke". */
+const IRREGULAR: Record<string, string> = { sent: "send", wore: "wear", worn: "wear", bought: "buy", paid: "pay", torn: "tear", tore: "tear", broke: "break", broken: "break", came: "come", went: "go", got: "get", took: "take", taken: "take", gave: "give", given: "give", slept: "sleep", lost: "lose", left: "leave" };
+
 export function stem(w: string): string {
+  if (IRREGULAR[w]) return IRREGULAR[w];
   if (/^us(e|es|ing)$/.test(w)) return "use";
   // Short words the rules below would cut to something else ("shoes" → "sho", then read as "show").
   if (/^(shoe|toe|hoe)s?$/.test(w)) return w.replace(/s$/, "");
@@ -203,14 +263,19 @@ export function createEngine(articles: Article[], synonymGroups: SynonymGroup[])
     }
   }
 
+  /** A real word the help center doesn't use ("boots", "stakes"): never "corrected" into one it does. */
+  const isRealWord = (w: string) =>
+    REAL_WORDS.has(w) || [/s$/, /es$/, /ed$/, /d$/, /ing$/, /ly$/].some((r) => r.test(w) && REAL_WORDS.has(w.replace(r, ""))) || (/ing$/.test(w) && REAL_WORDS.has(w.replace(/ing$/, "e")));
+
   function analyse(text: string, correct: boolean): Analysis {
-    const raw = words(text);
+    // Questions only: drop what the customer says they don't mean.
+    const raw = words(correct ? rephrase(fold(text).replace(NEGATION, " ")) : text);
     const corrections: Rewrite[] = [];
-    let seq = raw.map((w) => ({ w, s: stem(w), stop: STOP.has(w) }));
+    let seq = raw.map((w) => ({ w, s: stem(w), stop: STOP.has(w) || (correct && FILLER.has(w)) }));
     if (correct) {
       seq = seq.map((t) => {
-        if (t.stop || t.w.length < 5 || /\d/.test(t.w) || vocab.has(t.s)) return t;
-        const max = t.w.length >= 9 ? 2 : 1;
+        if (t.stop || t.w.length < 4 || /\d/.test(t.w) || vocab.has(t.s) || isRealWord(t.w)) return t;
+        const max = t.w.length >= 8 ? 2 : 1;
         let best: string | null = null;
         let bestD = max + 1;
         let bestF = 0;
@@ -236,17 +301,34 @@ export function createEngine(articles: Article[], synonymGroups: SynonymGroup[])
     const surface: Record<string, string> = {};
     for (let i = 0; i < seq.length; ) {
       const cands = phrases.get(seq[i].s);
-      const hit = cands?.find((p) => p.seq.every((w, k) => seq[i + k]?.s === w));
+      let end = i;
+      const hit = cands?.find((p) => {
+        // A phrase may have small words in between: "send it back", "money to be back".
+        let j = i;
+        for (const [k, w] of p.seq.entries()) {
+          let gap = 0;
+          while (k > 0 && seq[j] && seq[j].s !== w && STOP.has(seq[j].w) && gap < 2) {
+            j++;
+            gap++;
+          }
+          if (seq[j]?.s !== w) return false;
+          j++;
+        }
+        end = j;
+        return true;
+      });
       if (hit) {
-        const from = seq.slice(i, i + hit.seq.length).map((t) => t.w).join(" ");
+        const span = seq.slice(i, end).filter((t, k) => k === 0 || !STOP.has(t.w) || hit.seq.includes(t.s));
+        const from = seq.slice(i, end).map((t) => t.w).join(" ");
         // Only a real rewrite counts as a synonym, not a plural or a fixed typo of the same word.
-        if (seq.slice(i, i + hit.seq.length).map((t) => t.s).join("_") !== hit.canon) synonyms.push({ from, to: hit.canon.replace(/_/g, " ") });
+        if (span.map((t) => t.s).join("_") !== hit.canon) synonyms.push({ from, to: hit.canon.replace(/_/g, " ") });
         terms.push(hit.canon);
         surface[hit.canon] ??= from;
-        i += hit.seq.length;
+        i = end;
         continue;
       }
-      if (seq[i].stop) dropped.push(seq[i].w);
+      // Numbers the help center never mentions ("4 days", "180cm") say nothing about the topic.
+      if (seq[i].stop || (correct && /^\d/.test(seq[i].w) && !vocab.has(seq[i].s))) dropped.push(seq[i].w);
       else {
         terms.push(seq[i].s);
         surface[seq[i].s] ??= seq[i].w;
@@ -289,20 +371,37 @@ export function createEngine(articles: Article[], synonymGroups: SynonymGroup[])
 
   function scoreChunk(c: Chunk, terms: string[]) {
     let score = 0;
+    let found = 0;
+    let total = 0;
     const matched: string[] = [];
     for (const t of terms) {
+      const w = weightOf(t) * idf(t);
+      total += w;
       const f = c.tf.get(t);
       if (!f) continue;
       matched.push(t);
-      score += (idf(t) * f * (K1 + 1)) / (f + K1 * (1 - B + (B * c.len) / avgLen));
+      found += w;
+      score += (w * f * (K1 + 1)) / (f + K1 * (1 - B + (B * c.len) / avgLen));
     }
-    return { score, matched };
+    // Sections that answer more of the question rank above ones that repeat one word of it.
+    return { score: total ? score * (0.6 + 0.4 * (found / total)) : 0, matched };
   }
+
+  /** Intent words in a section's title and heading: "How long refunds take" is about refunds. */
+  const subjectOf = new Map(chunks.map((c) => [c.id, [...new Set([...analyse(c.article.title, false).terms, ...(c.heading ? analyse(c.heading, false).terms : [])])].filter((t) => INTENT.has(t))]));
 
   function rank(terms: string[], k = 5) {
     const uniq = [...new Set(terms)];
+    // A section about another intent than the question's ranks lower: "how long does shipping take" isn't about refunds.
+    const offSubject = (c: Chunk) => {
+      const subject = subjectOf.get(c.id)!;
+      return subject.length && !subject.some((t) => uniq.includes(t)) ? 0.7 : 1;
+    };
     return chunks
-      .map((c) => ({ c, ...scoreChunk(c, uniq) }))
+      .map((c) => {
+        const r = scoreChunk(c, uniq);
+        return { c, ...r, score: r.score * offSubject(c) };
+      })
       .filter((r) => r.score > 0)
       .sort((a, b) => b.score - a.score)
       .slice(0, k);
@@ -321,9 +420,9 @@ export function createEngine(articles: Article[], synonymGroups: SynonymGroup[])
     let covered = 0;
     let missing = 0;
     for (const t of uniq) {
-      if (inArticle.has(t)) covered += idf(t);
-      else if (df.has(t)) missing += idf(t) * 0.5;
-      else missing += maxIdf;
+      if (inArticle.has(t)) covered += weightOf(t) * idf(t);
+      else if (df.has(t)) missing += weightOf(t) * idf(t) * 0.5;
+      else missing += Math.min(1, weightOf(t)) * maxIdf;
     }
     const coverage = covered / (covered + missing);
     const strength = top.score / (top.score + 4);
@@ -423,13 +522,20 @@ export function createEngine(articles: Article[], synonymGroups: SynonymGroup[])
     if (IDENTITY.test(question))
       return { ...base, kind: "greeting", confidence: 1, text: "I'm Northfold's virtual assistant. I answer from our help center, show you the article I used, and pass you to a person when I'm not sure." };
 
+    if (JOBS.test(question))
+      return { ...base, kind: "clarify", confidence: 0, text: "I can only help with orders, shipping, returns and our gear. Open roles at Northfold are listed at northfold.example/careers." };
+
+    if (WEATHER.test(question))
+      return { ...base, kind: "clarify", confidence: 0, text: "I can't check the weather, sorry. I can help with orders, shipping, returns, sizing and choosing gear for the conditions you expect." };
+
     if (OTHER_LANGUAGE.test(question))
       return { ...base, kind: "clarify", confidence: 0, text: "Sorry, I can only answer in English for now. Could you ask again in English? If you prefer, type “talk to a person” and the team will reply by email." };
 
     // "Do you ship to Turkey?": answer from the country list instead of guessing.
     const lower = fold(question);
     const shipping = SHIP_WORDS.test(question) || /\b(to|in)\b/.test(lower);
-    const yes = SHIPS_TO.find((c) => new RegExp(`\\b${fold(c)}\\b`).test(lower));
+    const state = US_STATES.find((c) => new RegExp(`\\b${c}\\b`).test(lower));
+    const yes = SHIPS_TO.find((c) => new RegExp(`\\b${fold(c)}\\b`).test(lower)) ?? (state && "united states");
     const no = NOT_YET.find((c) => new RegExp(`\\b${fold(c)}\\b`).test(lower));
     const intl = chunks.find((c) => c.article.id === "international-shipping" && !c.heading) ?? chunks.find((c) => c.article.id === "international-shipping");
     if (SHIP_WORDS.test(question) && shipping && (yes || no) && intl) {
@@ -438,13 +544,17 @@ export function createEngine(articles: Article[], synonymGroups: SynonymGroup[])
       const text = no
         ? `We don't ship to ${country} yet. We ship to the US, Canada, the United Kingdom, the European Union, Norway, Switzerland, Australia, New Zealand, Singapore, Japan and the United Arab Emirates, and add countries a few times a year.`
         : domestic
-          ? "Yes, we ship everywhere in the United States. Standard shipping takes 3 to 5 business days."
+          ? "Yes, we ship everywhere in the United States. Standard shipping takes 3 to 5 business days and is free on orders over $75, otherwise $6.95."
           : `Yes, we ship to ${country}. International orders arrive in 5 to 10 business days, and shipping is free over $150, otherwise a flat $19.`;
-      return { ...base, kind: "answer", confidence: 1, text, citations: [cite(intl)], matched: [country] };
+      // A US address is answered from the domestic article, so the source matches the answer.
+      const us = domestic && (chunks.find((c) => c.article.id === "shipping-times" && /delivery options/i.test(c.heading ?? "")) ?? chunks.find((c) => c.article.id === "shipping-times"));
+      return { ...base, kind: "answer", confidence: 1, text, citations: [cite(us || intl)], matched: [country] };
     }
 
-    // Prices and stock of single products live on the product pages, not in the help center.
-    if (PRICE.test(question) && !POLICY_WORDS.test(question))
+    // Prices and stock of single products live on the product pages, not in the help center,
+    // unless the question clearly matches an article about other things ("how much credit for used gear").
+    const policyMatch = ranked[0] && confidence >= opts.threshold && ranked[0].matched.filter((t) => t !== "pric").length >= 2;
+    if (PRICE.test(question) && !POLICY_WORDS.test(question) && !policyMatch)
       return { ...base, kind: "clarify", confidence: 1, text: "I can't see live prices or stock. The product page at northfold.example shows the current price, sizes and availability. I can help with shipping, returns, sizing or warranty questions." };
 
     if (THANKS.test(question) && content.every((t) => THANKS_TERMS.has(t)))
@@ -474,10 +584,38 @@ export function createEngine(articles: Article[], synonymGroups: SynonymGroup[])
       }
     }
 
+    // "Is shipping free?" means the US unless the question names a country or says international.
+    if (ranked[0]?.c.article.id === "international-shipping" && !yes && !no && !content.some((t) => ["international", "duti"].includes(t))) {
+      const domestic = ranked.findIndex((r) => r.c.article.id === "shipping-times" && r.score >= ranked[0].score * 0.5);
+      if (domestic > 0) {
+        ranked = [ranked[domestic], ...ranked.filter((_, i) => i !== domestic)];
+        confidence = confidenceOf(analysis.terms, ranked[0]).confidence;
+      }
+    }
+
+    // The customer's intent ("repair", "return", "cancel") outweighs a rarer side word ("down" in
+    // "patch a hole in my down jacket"): prefer a close section that matches the intent.
+    const intents = content.filter((t) => INTENT.has(t));
+    if (intents.length && ranked[0] && !ranked[0].matched.some((t) => intents.includes(t))) {
+      const byIntent = ranked.findIndex((r) => r.matched.some((t) => intents.includes(t)) && r.score >= ranked[0].score * 0.6);
+      if (byIntent > 0) {
+        ranked = [ranked[byIntent], ...ranked.filter((_, i) => i !== byIntent)];
+        confidence = confidenceOf(analysis.terms, ranked[0]).confidence;
+      }
+    }
+
     const top = ranked[0];
     // Nothing in the question matches the help center at all (gibberish, off-topic): ask again rather than open a ticket.
     if (!top || (confidence < 0.12 && !top.matched.length))
       return { ...base, kind: "clarify", confidence, text: "I'm not sure I understood. I can help with orders, shipping, returns, sizing and warranty. Try “How do I start a return?”, or type “talk to a person”." };
+    // A clear winner: the best article matches strongly, covers a good part of the question and
+    // scores well above any other article. Words the help center never uses ("stuck", "half")
+    // then shouldn't be enough to hand off on their own.
+    if (confidence < opts.threshold) {
+      const runnerUp = ranked.find((r) => r.c.article.id !== top.c.article.id);
+      const { coverage, strength } = confidenceOf(analysis.terms, top);
+      if (strength >= 0.5 && coverage >= 0.4 && top.score >= (runnerUp?.score ?? 0) * 1.5) confidence = Math.max(confidence, CLEAR_WINNER);
+    }
     if (confidence < opts.threshold) return { ...base, kind: "handoff", confidence, handoff: true, text: "", citations: [cite(top.c)] };
 
     const citations = [cite(top.c)];

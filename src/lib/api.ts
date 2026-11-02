@@ -11,6 +11,10 @@ export const VISITOR: Customer = { name: "Website visitor", email: "visitor@mail
 export const uid = (prefix: string) => `${prefix}${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 const nowIso = () => new Date().toISOString();
 
+/** Longest message the widget and the inbox accept; longer text is cut, not stored whole. */
+export const MAX_MESSAGE = 2000;
+const clip = (text: string) => text.trim().slice(0, MAX_MESSAGE);
+
 const find = (s: DemoState, id: string) => s.conversations.find((c) => c.id === id);
 
 /** Moves a conversation to the top of the inbox. */
@@ -26,7 +30,8 @@ export function visitorConversation(state: DemoState): Conversation | undefined 
 }
 
 /** Stores a message from the website visitor and returns the conversation id. */
-export function addCustomerMessage(text: string): string {
+export function addCustomerMessage(raw: string): string {
+  const text = clip(raw);
   let id = visitorConversation(getState())?.id;
   update((s) => {
     let c = id ? find(s, id) : undefined;
@@ -93,7 +98,7 @@ export function sendAgentReply(conversationId: string, text: string) {
   update((s) => {
     const c = find(s, conversationId);
     if (!c) return;
-    c.messages.push({ id: uid("m"), role: "agent", agentId: ME.id, text, at: nowIso() });
+    c.messages.push({ id: uid("m"), role: "agent", agentId: ME.id, text: clip(text), at: nowIso() });
     c.status = "agent";
     c.assigneeId = ME.id;
     c.handoffAt ??= nowIso();

@@ -13,6 +13,7 @@ import { ChatWidget, articleHref, openChat, sectionSlug } from "./chat-widget";
 import { RichText } from "./rich-text";
 import { ThemeToggle } from "./theme-toggle";
 import { Spinner, cx } from "./ui";
+import { StorageNotice } from "./storage-notice";
 
 const ICONS: Record<Category, React.ComponentType<{ className?: string }>> = {
   orders: Package,
@@ -349,6 +350,35 @@ function ArticleView({ article, section, state }: { article: Article; section: s
   );
 }
 
+/** A link to an article that was deleted or renamed (old bookmark, citation in an old chat). */
+function ArticleMissing({ state }: { state: DemoState }) {
+  const popular = POPULAR.map((pid) => state.articles.find((a) => a.id === pid)).filter((a): a is Article => !!a).slice(0, 4);
+  return (
+    <div className="mx-auto max-w-2xl px-4 py-16 animate-enter sm:px-6">
+      <p className="font-mono text-xs text-muted">Article not found</p>
+      <h1 className="mt-2 text-[24px] leading-tight font-semibold tracking-[-0.02em]">This article isn&apos;t available</h1>
+      <p className="mt-2 text-sm text-muted">It may have been removed or renamed. Search the help center, or ask the assistant in the corner.</p>
+      <a href="#" className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-accent hover:underline">
+        Back to the help center <ArrowRight className="size-3.5" aria-hidden />
+      </a>
+      {popular.length > 0 && (
+        <div className="mt-10">
+          <h2 className="text-xs font-medium text-muted">Popular articles</h2>
+          <ul className="mt-2 space-y-1.5 text-sm">
+            {popular.map((a) => (
+              <li key={a.id}>
+                <a href={articleHref(a.id, null)} className="text-text hover:text-accent">
+                  {a.title}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function HelpCenter() {
   const state = useStore();
   const hash = useHash();
@@ -358,8 +388,11 @@ export function HelpCenter() {
   return (
     <div className="min-h-screen">
       <DemoBar />
+      <StorageNotice />
       <SiteHeader />
-      <main id="main">{!state ? <Spinner /> : article ? <ArticleView article={article} section={section} state={state} /> : <Home state={state} />}</main>
+      <main id="main">
+        {!state ? <Spinner /> : article ? <ArticleView article={article} section={section} state={state} /> : id ? <ArticleMissing state={state} /> : <Home state={state} />}
+      </main>
       <footer className="border-t border-border">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-4 py-6 text-xs text-faint sm:px-6">
           <span>© 2026 Northfold, a fictional company for this demo. All data is synthetic.</span>

@@ -62,7 +62,10 @@ Everything is in [`src/lib/engine.ts`](src/lib/engine.ts):
    synonym phrases mapped to the help center's own words, filler words dropped.
 2. **Retrieve:** BM25 over article sections (each `##` heading is a section), with title and heading words weighted up.
 3. **Score confidence** from two signals: how much of the question the best article covers (words the help center
-   never uses count fully against it), and how strongly the best section matches.
+   never uses count fully against it), and how strongly the best section matches. A clear winner (strong match,
+   well ahead of every other article) is answered even when the question has a few unknown words.
+   The customer's intent ("repair", "cancel", "return") outweighs a rare side word, and what they say they
+   don't want ("I don't need a refund") is dropped.
 4. **Answer or hand off:** above the threshold, the reply is composed from the most relevant sentences of that
    section and cites it; below it, the chat goes to the team.
 
@@ -104,6 +107,20 @@ BASE_URL=https://ozenyunus35.github.io/ai-support-assistant/ npm run test:e2e   
   handoff and a live reply from the inbox to the widget in a second tab, new articles and synonyms used right away,
   settings, inbox filters, reset, theme, phone layout, and a check that no page scrolls sideways, on four
   browser/device profiles.
+
+- **Answer quality:** [`tests/unit/quality.test.ts`](tests/unit/quality.test.ts) checks the engine on question sets
+  with floors a change can't drop below: two sets it was tuned on, a holdout set it was never tuned on, and
+  thousands of random customer questions from a generator with typos, filler and emotional openers.
+
+  | Measured on 2 Nov 2026 | Before | Now |
+  | --- | --- | --- |
+  | Holdout (100 questions): right | 57% | 73% |
+  | Holdout: answered from the wrong article | 10% | 7% |
+  | Random (12,000 questions, 3 unseen seeds): right | 44% | 77% |
+  | Random: answered from the wrong article | 7.1% | 1.5% |
+  | Off-topic questions answered from an article | 0 | 0 |
+
+  The rest are handed to a person, which is the safe failure for a support assistant.
 
 GitHub Actions runs lint, type check, unit and e2e tests on every push to `main`, then deploys to GitHub Pages.
 

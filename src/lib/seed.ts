@@ -3,7 +3,7 @@ import { ARTICLES, SYNONYMS } from "./kb";
 import type { Agent, Conversation, Customer, DemoState, Message, Order, Settings } from "./types";
 
 /** Bump when the shape of the stored state changes, so old browsers reseed. */
-export const STATE_VERSION = 4;
+export const STATE_VERSION = 5;
 
 export const AGENTS: Agent[] = [
   { id: "ag-sam", name: "Sam Rivera", title: "Support lead" },

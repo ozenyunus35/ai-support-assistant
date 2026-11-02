@@ -3,7 +3,7 @@
 import { ArrowLeft, Check, CornerDownLeft, Inbox as InboxIcon, Search, Sparkles, ThumbsDown, ThumbsUp } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
-import { resolveConversation, sendAgentReply } from "@/lib/api";
+import { MAX_MESSAGE, resolveConversation, sendAgentReply } from "@/lib/api";
 import { duration, formatDateTime, formatTime, pct, timeAgo } from "@/lib/format";
 import { CATEGORIES } from "@/lib/kb";
 import { engineFor, useStore } from "@/lib/store";
@@ -230,12 +230,13 @@ function Detail({ c, state, onBack }: { c: Conversation; state: DemoState; onBac
                 }
               }}
               rows={3}
+              maxLength={MAX_MESSAGE}
               aria-label="Reply"
               placeholder={`Reply to ${c.customer.name.split(" ")[0]}…`}
               className="block w-full resize-none bg-transparent px-3 py-2 text-[13px] placeholder:text-faint focus:outline-none"
             />
             <div className="flex items-center justify-between gap-2 px-2 pb-2">
-              <span className="hidden pl-1 text-[11px] text-faint sm:inline">⌘ Enter to send</span>
+              <span className="hidden pl-1 text-[11px] text-faint sm:inline">{draft.length > MAX_MESSAGE - 200 ? `${draft.length}/${MAX_MESSAGE}` : "⌘ Enter to send"}</span>
               <Button variant="primary" size="sm" onClick={send} disabled={!draft.trim()} className="ml-auto">
                 <CornerDownLeft /> Send reply
               </Button>

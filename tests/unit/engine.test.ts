@@ -98,11 +98,17 @@ describe("questions outside the articles", () => {
 });
 
 describe("handoff", () => {
-  it.each(["do you sell kayaks?", "do you have a student discount", "what's the weather like"])("hands off %j", (q) => {
+  it.each(["do you sell kayaks?", "do you have a student discount"])("hands off %j", (q) => {
     const r = ask(q);
     expect(r.kind).toBe("handoff");
     expect(r.handoff).toBe(true);
     expect(r.confidence).toBeLessThan(0.45);
+  });
+
+  it.each(["what's the weather like", "will it rain tomorrow in Denver", "is it going to snow this weekend"])("doesn't answer weather questions from gear articles: %j", (q) => {
+    const r = ask(q);
+    expect(r.kind).toBe("clarify");
+    expect(r.citations).toEqual([]);
   });
 
   it("hands off at once when someone asks for a person", () => {
@@ -111,9 +117,19 @@ describe("handoff", () => {
   });
 
   it("follows the threshold", () => {
-    const q = "how much is express shipping";
-    expect(engine.answer(q, { threshold: 0.3 }).kind).toBe("answer");
-    expect(engine.answer(q, { threshold: 0.999 }).kind).toBe("handoff");
+    const q = "can you patch a hole in my down jacket";
+    const c = engine.answer(q, { threshold: 0 }).confidence;
+    expect(c).toBeGreaterThan(0.3);
+    expect(c).toBeLessThan(1);
+    expect(engine.answer(q, { threshold: c - 0.01 }).kind).toBe("answer");
+    expect(engine.answer(q, { threshold: c + 0.01 }).kind).toBe("handoff");
+  });
+
+  it("a stricter threshold also hands off clear winners", () => {
+    // The help center never mentions "got", so this answers only through the clear-winner rule.
+    const q = "got my package but the backpack is missing";
+    expect(engine.answer(q, { threshold: 0.45 }).kind).toBe("answer");
+    expect(engine.answer(q, { threshold: 0.8 }).kind).toBe("handoff");
   });
 });
 

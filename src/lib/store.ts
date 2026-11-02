@@ -16,6 +16,8 @@ const VISITOR_KEY = "relay:visitor";
 
 let snap: DemoState | null = null;
 const listeners = new Set<() => void>();
+/** False after a save failed (storage full or blocked): changes then live only in this tab. */
+let saved = true;
 
 function read(): DemoState {
   try {
@@ -35,8 +37,10 @@ function read(): DemoState {
 function persist(state: DemoState) {
   try {
     localStorage.setItem(STATE_KEY, JSON.stringify(state));
+    saved = true;
   } catch {
-    // Private mode or full storage: the demo keeps working in memory.
+    // Private mode or full storage: the demo keeps working in memory, and says so.
+    saved = false;
   }
 }
 
@@ -78,6 +82,11 @@ function subscribe(listener: () => void) {
     listeners.delete(listener);
     window.removeEventListener("storage", onStorage);
   };
+}
+
+/** Whether the last change was saved in this browser; true on the server. */
+export function useSaved(): boolean {
+  return useSyncExternalStore(subscribe, () => saved, () => true);
 }
 
 /** The demo state, or null while rendering on the server (static export). */

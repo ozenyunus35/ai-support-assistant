@@ -2,7 +2,7 @@
 
 import { ArrowUp, ArrowUpRight, ChevronDown, Clock, MessageCircle, RotateCcw, ThumbsDown, ThumbsUp } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { addCustomerMessage, assistantRespond, newVisitorConversation, requestHuman, setFeedback, visitorConversation } from "@/lib/api";
+import { MAX_MESSAGE, addCustomerMessage, assistantRespond, newVisitorConversation, requestHuman, setFeedback, visitorConversation } from "@/lib/api";
 import { formatDate, formatTime, pct } from "@/lib/format";
 import { getState, useStore } from "@/lib/store";
 import type { Conversation, DemoState, Message, OrderCard } from "@/lib/types";
@@ -370,6 +370,7 @@ export function ChatWidget() {
                 ref={input}
                 value={draft}
                 rows={1}
+                maxLength={MAX_MESSAGE}
                 onChange={(e) => {
                   setDraft(e.target.value);
                   const t = e.target;
@@ -395,7 +396,13 @@ export function ChatWidget() {
                 <input type="checkbox" checked={details} onChange={toggleDetails} className="size-3 accent-[var(--accent)]" />
                 Show retrieval details
               </label>
-              <span>Demo · powered by Relay</span>
+              {draft.length > MAX_MESSAGE - 200 ? (
+                <span className={draft.length >= MAX_MESSAGE ? "text-danger" : undefined} aria-live="polite">
+                  {draft.length}/{MAX_MESSAGE}
+                </span>
+              ) : (
+                <span>Demo · powered by Relay</span>
+              )}
             </div>
           </form>
         </section>

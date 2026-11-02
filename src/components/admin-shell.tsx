@@ -11,6 +11,7 @@ import { RelayMark } from "./brand";
 import { ThemeToggle } from "./theme-toggle";
 import { useToast } from "./toast";
 import { Avatar, Button, Modal, Spinner, cx } from "./ui";
+import { StorageNotice } from "./storage-notice";
 
 export const NAV = [
   { href: "/admin", label: "Overview", icon: LayoutDashboard },
@@ -128,6 +129,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
             <ThemeToggle />
           </div>
         </header>
+        <StorageNotice />
         <main id="main" className="mx-auto max-w-[1280px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
           {children}
         </main>
