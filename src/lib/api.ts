@@ -1,5 +1,6 @@
 "use client";
 
+import { HANDOFF_REQUESTED, respondTo } from "./dialog";
 import { ME } from "./seed";
 import { engineFor, getState, setVisitorConversationId, update, visitorConversationId } from "./store";
 import type { Article, Conversation, Customer, DemoState, Message, Settings, SynonymGroup } from "./types";
@@ -64,24 +65,27 @@ export function assistantRespond(conversationId: string): Message | undefined {
   const last = conv?.messages[conv.messages.length - 1];
   if (!conv || !last || last.role !== "customer" || !assistantActive(conv)) return undefined;
   const engine = engineFor(state);
-  const r = engine.answer(last.text, { threshold: state.settings.threshold, orders: state.orders });
+  // The whole conversation context goes in, not just the last message: "What about Germany?" and "Cancel that order" need it.
+  const r = respondTo(engine, last.text, conv.context, { threshold: state.settings.threshold, orders: state.orders });
   // Already queued for a person: unsure questions wait for them instead of a second handoff message.
-  if (conv.status === "needs-human" && r.handoff) return undefined;
+  if (conv.status === "needs-human" && r.kind === "handoff") return undefined;
+  const handoffText = r.handoffReason === "requested" ? HANDOFF_REQUESTED : state.settings.handoffMessage;
   const message: Message = {
     id: uid("m"),
     role: "assistant",
-    text: r.handoff ? state.settings.handoffMessage : r.text,
+    text: r.kind === "handoff" ? handoffText : r.text,
     at: nowIso(),
-    answer: { kind: r.kind, confidence: r.confidence, citations: r.citations, matched: r.matched },
+    answer: { kind: r.kind, confidence: r.confidence, citations: r.citations, matched: r.matched, method: r.method, covered: r.covered, total: r.total, handoffReason: r.handoffReason, rules: r.notes },
     order: r.order,
   };
   update((s) => {
     const c = find(s, conversationId)!;
     c.messages.push(message);
+    c.context = r.context;
     if (!c.topic && r.citations[0] && !r.handoff) c.topic = s.articles.find((a) => a.id === r.citations[0].articleId)?.category;
     if (r.handoff) {
       c.status = "needs-human";
-      c.handoffAt = nowIso();
+      c.handoffAt ??= nowIso();
     }
     touch(s, c);
   });
@@ -92,7 +96,7 @@ export function requestHuman(conversationId: string) {
   update((s) => {
     const c = find(s, conversationId);
     if (!c || c.status !== "open") return;
-    c.messages.push({ id: uid("m"), role: "assistant", text: s.settings.handoffMessage, at: nowIso(), answer: { kind: "handoff", confidence: 1, citations: [], matched: [] } });
+    c.messages.push({ id: uid("m"), role: "assistant", text: HANDOFF_REQUESTED, at: nowIso(), answer: { kind: "handoff", confidence: 1, citations: [], matched: [], handoffReason: "requested" } });
     c.status = "needs-human";
     c.handoffAt = nowIso();
     touch(s, c);

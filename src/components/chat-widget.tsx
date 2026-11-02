@@ -55,19 +55,31 @@ function OrderStatus({ order }: { order: OrderCard }) {
   );
 }
 
+/** What the assistant tells the customer about how sure it is: a retrieval score only where retrieval was used. */
 function Details({ message, threshold }: { message: Message; threshold: number }) {
   const a = message.answer;
-  if (!a || !["answer", "handoff"].includes(a.kind) || (a.kind === "handoff" && a.confidence === 1)) return null;
-  const below = a.confidence < threshold;
+  if (!a || !["answer", "handoff", "clarify"].includes(a.kind) || (a.kind === "handoff" && a.confidence === 1)) return null;
+  const rule = a.method === "rule";
+  const below = !rule && a.confidence < threshold;
+  const many = (a.total ?? 0) > 1;
   return (
     <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-faint" data-testid="answer-details">
-      <span className="inline-flex items-center gap-1.5">
-        <span className="h-1 w-10 overflow-hidden rounded-full bg-surface-3" aria-hidden>
-          <span className={cx("block h-full rounded-full", below ? "bg-warning" : "bg-accent")} style={{ width: pct(a.confidence) }} />
+      {rule ? (
+        <span>Answered by policy rule</span>
+      ) : (
+        <span className="inline-flex items-center gap-1.5">
+          <span className="h-1 w-10 overflow-hidden rounded-full bg-surface-3" aria-hidden>
+            <span className={cx("block h-full rounded-full", below ? "bg-warning" : "bg-accent")} style={{ width: pct(a.confidence) }} />
+          </span>
+          Retrieval match {pct(a.confidence)}
+          {below && ` · under ${pct(threshold)}`}
         </span>
-        Confidence {pct(a.confidence)}
-        {below && ` · under ${pct(threshold)}`}
-      </span>
+      )}
+      {many && (
+        <span>
+          {a.covered} of {a.total} requests answered
+        </span>
+      )}
       {a.matched.length > 0 && (
         <span className="flex flex-wrap gap-1">
           {[...new Set(a.matched)].slice(0, 5).map((t) => (

@@ -1,3 +1,5 @@
+import type { DialogContext } from "./dialog";
+
 export type Category = "orders" | "returns" | "products" | "warranty" | "account" | "club";
 
 export interface Article {
@@ -29,6 +31,12 @@ export interface AnswerMeta {
   citations: Citation[];
   /** Matched query terms after normalisation, shown in the admin transcript. */
   matched: string[];
+  /** Added with the conversation layer; messages stored before it have none of these. */
+  method?: "rule" | "retrieval" | "mixed";
+  covered?: number;
+  total?: number;
+  handoffReason?: "requested" | "low-confidence";
+  rules?: string[];
 }
 
 export interface OrderCard {
@@ -74,6 +82,8 @@ export interface Conversation {
   topic?: Category;
   /** True for the conversation started in this browser through the widget. */
   live?: boolean;
+  /** What the assistant carries between messages (topic, country, order number, days). Absent in older stored chats. */
+  context?: DialogContext;
   messages: Message[];
 }
 
@@ -99,8 +109,9 @@ export interface Settings {
   assistantName: string;
   greeting: string;
   suggestions: string[];
-  /** Answers below this confidence (0..1) are handed to a person. */
+  /** Answers with a retrieval match below this (0..1) are handed to a person. */
   threshold: number;
+  /** Shown when the assistant is unsure. A customer asking for a person gets a fixed message instead. */
   handoffMessage: string;
   replyTime: string;
 }

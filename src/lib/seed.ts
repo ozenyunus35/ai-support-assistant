@@ -19,7 +19,7 @@ export const DEFAULT_SETTINGS: Settings = {
   greeting: "Hi! I answer from the Northfold help center, and I'll bring in a teammate whenever you need one. What can I help with?",
   suggestions: ["How long do refunds take?", "Do you ship to Canada?", "Where is my order NF-20481?", "How do I wash a rain jacket?"],
   threshold: 0.45,
-  handoffMessage: "I'm not confident I have the right answer for this, so I've asked a teammate to join. They'll reply right here.",
+  handoffMessage: "I don't have enough information to answer this confidently, so I've asked a teammate to join. They'll reply right here.",
   replyTime: "The team usually replies in under 10 minutes",
 };
 

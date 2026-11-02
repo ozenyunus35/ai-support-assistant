@@ -11,6 +11,7 @@ import { RelayMark } from "./brand";
 import { ThemeToggle } from "./theme-toggle";
 import { useToast } from "./toast";
 import { Avatar, Button, Modal, Spinner, cx } from "./ui";
+import { DemoGuide } from "./demo-guide";
 import { StorageNotice } from "./storage-notice";
 
 export const NAV = [
@@ -119,6 +120,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
           <div className="ml-auto flex items-center gap-1">
             <span className="mr-1 hidden items-center gap-2 text-xs text-muted md:flex">
               Demo · synthetic data
+              <DemoGuide className="text-text" />
               <button onClick={() => setConfirmReset(true)} className="rounded-md border border-border px-2 py-0.5 text-text hover:bg-surface-2">
                 Reset demo data
               </button>

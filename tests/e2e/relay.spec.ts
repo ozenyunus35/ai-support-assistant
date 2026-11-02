@@ -64,7 +64,7 @@ test("assistant answers with a source, takes feedback and links to the article",
   const panel = await openWidget(page);
   await panel.getByRole("button", { name: "How long do refunds take?" }).click();
   await expect(panel.getByText("PayPal: within 24 hours.")).toBeVisible();
-  await expect(panel.getByTestId("answer-details")).toContainText("Confidence");
+  await expect(panel.getByTestId("answer-details")).toContainText("Retrieval match");
   const helpful = panel.getByRole("button", { name: "Helpful", exact: true });
   await helpful.click();
   await expect(helpful).toHaveAttribute("aria-pressed", "true");
@@ -177,7 +177,7 @@ test("settings preview the threshold and change the widget", async ({ page }) =>
   await page.goto("./admin/settings/");
   const impact = page.getByTestId("threshold-impact");
   const before = await impact.textContent();
-  await page.getByLabel("Confidence threshold").fill("0.8");
+  await page.getByLabel("Retrieval-match threshold").fill("0.8");
   await expect(impact).not.toHaveText(before ?? "");
   await page.getByLabel("Name shown in the widget").fill("Northfold Helper");
   await page.getByRole("button", { name: "Save settings" }).click();
@@ -308,4 +308,78 @@ test("playground explains shorthand and the rules it applied", async ({ page }) 
   await expect(page.getByTestId("used-section").locator("xpath=..")).toContainText("How to start a return");
   await expect(page.getByTestId("used-section").locator("xpath=..")).not.toContainText("Returning in store");
   await expect(page.getByText(/northfold\.example\/returns/).first()).toBeVisible();
+});
+
+test("a follow-up question keeps the topic: Canada, then Germany", async ({ page }) => {
+  await page.goto("./");
+  let panel = await ask(page, "Do you ship to Canada?");
+  await expect(panel.getByText(/Yes, we ship to Canada/)).toBeVisible();
+  panel = await ask(page, "What about Germany?");
+  await expect(panel.getByText(/Yes, we ship to Germany/)).toBeVisible();
+  await expect(panel.getByText(/VAT are calculated and charged at checkout/)).toBeVisible();
+});
+
+test("'Cancel that order' uses the order that was just looked up, and cancels nothing", async ({ page }) => {
+  await page.goto("./");
+  let panel = await ask(page, "NF-20481");
+  await expect(panel.getByLabel("Order NF-20481")).toBeVisible();
+  panel = await ask(page, "Cancel that order, please.");
+  await expect(panel.getByText(/NF-20481 was placed .* already shipped/)).toBeVisible();
+  await expect(panel.getByText(/nothing has been cancelled/)).toBeVisible();
+});
+
+test("two questions in one message are both answered with their own source", async ({ page }) => {
+  await page.goto("./");
+  const panel = await ask(page, "Do you ship to Canada and can I return a used tent after 45 days?");
+  await expect(panel.getByText(/Shipping: Yes, we ship to Canada/)).toBeVisible();
+  await expect(panel.getByText(/At 45 days you are past that limit/)).toBeVisible();
+  await expect(panel.getByTestId("answer-details")).toContainText("Answered by policy rule");
+  await expect(panel.getByTestId("answer-details")).toContainText("2 of 2 requests answered");
+});
+
+test("a new conversation carries nothing over from the old one", async ({ page }) => {
+  await page.goto("./");
+  let panel = await ask(page, "Do you ship to Canada?");
+  await expect(panel.getByText(/Yes, we ship to Canada/)).toBeVisible();
+  await panel.getByRole("button", { name: "Start a new conversation" }).click();
+  panel = await ask(page, "What about Germany?");
+  await expect(panel.getByText(/Searching \d+ help articles/)).toBeHidden({ timeout: 10_000 });
+  await expect(panel.getByText(/Yes, we ship to Germany/)).toHaveCount(0);
+});
+
+test("asking for a person and being unsure give different hand-off messages", async ({ page }) => {
+  await page.goto("./");
+  let panel = await ask(page, "I want a human, not an automated answer.");
+  await expect(panel.getByText("I'm connecting you with a teammate. They'll reply right here.")).toBeVisible();
+  await panel.getByRole("button", { name: "Start a new conversation" }).click();
+  panel = await ask(page, "Do you sell kayaks?");
+  await expect(panel.getByText(/I don't have enough information to answer this confidently/)).toBeVisible();
+});
+
+test("playground shows requests, facts and the context a follow-up used", async ({ page }) => {
+  await page.goto("./admin/playground/");
+  await expect(page.getByTestId("pg-mode")).toContainText("Single message");
+  await page.getByLabel("Customer question").fill("Do you ship to Canada?");
+  await page.getByTestId("pg-send").click();
+  await page.getByLabel("Customer question").fill("What about Germany?");
+  await expect(page.getByTestId("pg-mode")).toContainText("Conversation mode");
+  await expect(page.getByTestId("dialog-context")).toContainText("shipping");
+  await expect(page.getByTestId("dialog-facts")).toContainText("country germany");
+  await page.getByTestId("pg-reset").click();
+  await expect(page.getByTestId("dialog-context")).toContainText("single message");
+  await page.getByLabel("Customer question").fill("Do not track NF-20481. Tell me your return policy.");
+  await expect(page.getByTestId("dialog-negated")).toContainText("track");
+  await expect(page.getByTestId("decision")).toHaveText("Answer");
+});
+
+test("'How this demo works' is one click away and lists the 90-second route", async ({ page }) => {
+  await page.goto("./");
+  await page.getByTestId("demo-guide-open").click();
+  const guide = page.getByTestId("demo-guide");
+  await expect(guide).toContainText("no language-model call");
+  await expect(guide).toContainText("not a multi-user system");
+  await expect(guide).toContainText("A 90-second route");
+  await page.keyboard.press("Escape");
+  await expect(guide).toBeHidden();
+  await noHorizontalScroll(page);
 });

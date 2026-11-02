@@ -95,9 +95,11 @@ function Bubble({ m, state, threshold }: { m: Message; state: DemoState; thresho
       <div className={cx("rounded-2xl rounded-tr-md border px-3 py-2", handoff ? "border-warning/40 bg-warning-soft" : "border-border bg-surface")}>
         <p className="mb-1 flex items-center gap-1.5 text-[11px] font-medium text-muted">
           <Sparkles className="size-3" aria-hidden /> {handoff ? "AI handed off" : "AI answer"}
-          {a && a.kind !== "greeting" && a.kind !== "thanks" && (
-            <span className={cx("font-normal tabular-nums", a.confidence < threshold ? "text-warning" : "text-faint")}>
-              · confidence {pct(a.confidence)}
+          {a && a.kind !== "greeting" && a.kind !== "thanks" && !(a.kind === "handoff" && a.confidence === 1 && !a.handoffReason) && (
+            <span className={cx("font-normal tabular-nums", a.method !== "rule" && a.confidence < threshold ? "text-warning" : "text-faint")}>
+              · {a.method === "rule" ? "policy rule" : `retrieval match ${pct(a.confidence)}`}
+              {a.total && a.total > 1 ? ` · ${a.covered} of ${a.total} requests` : ""}
+              {a.kind === "handoff" && a.handoffReason ? ` · ${a.handoffReason === "requested" ? "customer asked for a person" : "not enough information"}` : ""}
             </span>
           )}
         </p>
@@ -210,7 +212,7 @@ function Detail({ c, state, onBack }: { c: Conversation; state: DemoState; onBac
               <Sparkles className="mt-0.5 size-3.5 shrink-0 text-accent" aria-hidden />
               <div className="min-w-0 flex-1">
                 <p className="text-xs text-muted">
-                  Suggested from <span className="text-text">{suggestion.citations[0].title}</span> · {pct(suggestion.confidence)} match
+                  Suggested from <span className="text-text">{suggestion.citations[0].title}</span> · retrieval match {pct(suggestion.confidence)}
                 </p>
                 <p className="mt-0.5 line-clamp-2">{suggestion.text.replace(/\n- /g, " · ").replace(/^- /, "")}</p>
               </div>

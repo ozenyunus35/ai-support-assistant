@@ -46,19 +46,19 @@ describe("answer quality", () => {
     expect(s.wrong).toBeLessThanOrEqual(0.05);
   });
 
-  it("second holdout (67% right, 9% confidently wrong measured; 65% and 7% before the second round)", () => {
+  it("second holdout (68% right, 10% confidently wrong measured on 2 Nov after the help center fix; 65% and 7% before the second round)", () => {
     const s = score(holdout2 as Array<[string, string]>);
     expect(s.right).toBeGreaterThanOrEqual(0.64);
     expect(s.wrong).toBeLessThanOrEqual(0.1);
   });
 
-  it.each([31337, 4242, 123456])("random questions, seed %i (81% right, 0.5% confidently wrong measured; 44% and 7% at first)", (seed) => {
+  it.each([31337, 4242, 123456])("random questions, seed %i (81% right, 0.6% confidently wrong measured; 44% and 7% at first)", (seed) => {
     const s = score(randomQuestions(2000, seed));
     expect(s.right).toBeGreaterThanOrEqual(0.78);
     expect(s.wrong).toBeLessThanOrEqual(0.015);
   });
 
-  it.each([22, 33])("second generator, seed %i (63% right, 4% confidently wrong measured; 51% and 7% before)", (seed) => {
+  it.each([22, 33])("second generator, seed %i (63% right, 3.9% confidently wrong measured; 51% and 7% before)", (seed) => {
     const s = score(randomQuestions2(3000, seed));
     expect(s.right).toBeGreaterThanOrEqual(0.6);
     expect(s.wrong).toBeLessThanOrEqual(0.055);

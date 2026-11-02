@@ -60,7 +60,7 @@ const SHORTHAND: Record<string, string> = {
   thx: "thanks", ty: "thanks", abt: "about", pkg: "package", msg: "message", rn: "now", wanna: "want to", gonna: "going to", dont: "do not", cant: "cannot",
 };
 
-function rephrase(text: string) {
+export function rephrase(text: string) {
   return text
     .replace(/[\p{L}']+/gu, (w) => SHORTHAND[w.toLowerCase()] ?? w)
     .replace(/\b(send|give|take|bring|mail|post)\s+((?:[\p{L}'-]+\s+){1,3}?)back\b/giu, "$1 back $2")
@@ -97,10 +97,10 @@ const IDENTITY = /\b(who|what) are you\b|\bare you (a |an )?(bot|robot|human|rea
 const HOW_TO = /^\s*(how (do|can|should|would) (i|we|you)|how to)\b/i;
 const PRICE = /\b(price|prices|cost|costs|how much)\b/i;
 const POLICY_WORDS = /\b(ship|shipping|deliver|delivery|return|refund|exchange|fee|fees|membership|club|rent|rental|repair|warranty|label|duties|tax|klarna|gift card|went down|gone down|dropped|drop|adjustment|difference)\b/i;
-const SHIP_WORDS = /\b(ship|ships|shipping|deliver|delivers|delivery|send|post)\b/i;
+export const SHIP_WORDS = /\b(ship|ships|shipping|deliver|delivers|delivery|send|post)\b/i;
 // Letters and words that only show up when someone writes in another language.
 /** A money amount in a help center section: "$6.95", "€19". */
-const AMOUNT = /[$€£]\s?\d/;
+export const AMOUNT = /[$€£]\s?\d/;
 
 /** Confidence given to a clear winner; a stricter threshold set by the team still hands these off. */
 const CLEAR_WINNER = 0.5;
@@ -109,18 +109,18 @@ const NAMED_RATIO = 0.6;
 
 /** Weather forecasts: nothing in the help center can answer them, however much they mention rain or snow. */
 const WEATHER = /\b(weather|forecast|will it (rain|snow)|is it (going to )?(rain|snow)|(rain|snow)(ing)? (today|tomorrow|tonight|this weekend))\b/i;
-const OTHER_LANGUAGE = /[ığşİĞŞñ¿¡ßœ]|\b(nasıl|neden|nerede|kargo|sipariş|iade|merhaba|cómo|dónde|envío|pedido|hola|wie|wo|bestellung|versand|rückgabe|hallo|bonjour|commande|livraison|où|olá|encomenda)\b/i;
+export const OTHER_LANGUAGE = /[ığşİĞŞñ¿¡ßœ]|\b(nasıl|neden|nerede|kargo|sipariş|iade|merhaba|cómo|dónde|envío|pedido|hola|wie|wo|bestellung|versand|rückgabe|hallo|bonjour|commande|livraison|où|olá|encomenda)\b/i;
 
 /** Countries the help center lists in "International shipping", plus the US itself. */
-const SHIPS_TO = ["united states", "usa", "us", "america", "canada", "united kingdom", "uk", "britain", "england", "scotland", "wales", "norway", "switzerland", "australia", "new zealand", "singapore", "japan", "united arab emirates", "uae", "dubai",
+export const SHIPS_TO = ["united states", "usa", "us", "america", "canada", "united kingdom", "uk", "britain", "england", "scotland", "wales", "norway", "switzerland", "australia", "new zealand", "singapore", "japan", "united arab emirates", "uae", "dubai",
   "germany", "france", "spain", "italy", "netherlands", "holland", "belgium", "austria", "ireland", "portugal", "poland", "sweden", "denmark", "finland", "greece", "czechia", "czech republic", "hungary", "romania", "bulgaria", "croatia", "slovakia", "slovenia", "estonia", "latvia", "lithuania", "luxembourg", "malta", "cyprus"];
 /** US states: "delivery to California" is a domestic shipping question. */
-const US_STATES = ["alabama", "alaska", "arizona", "arkansas", "california", "colorado", "connecticut", "delaware", "florida", "georgia", "hawaii", "idaho", "illinois", "indiana", "iowa", "kansas", "kentucky", "louisiana", "maine", "maryland", "massachusetts", "michigan", "minnesota", "mississippi", "missouri", "montana", "nebraska", "nevada", "new hampshire", "new jersey", "new mexico", "new york", "north carolina", "north dakota", "ohio", "oklahoma", "oregon", "pennsylvania", "rhode island", "south carolina", "south dakota", "tennessee", "texas", "utah", "vermont", "virginia", "washington", "west virginia", "wisconsin", "wyoming", "puerto rico"];
-const NOT_YET = ["turkey", "türkiye", "turkiye", "mexico", "brazil", "argentina", "chile", "colombia", "peru", "india", "pakistan", "bangladesh", "china", "hong kong", "taiwan", "south korea", "korea", "indonesia", "malaysia", "thailand", "vietnam", "philippines", "russia", "ukraine", "israel", "saudi arabia", "qatar", "kuwait", "egypt", "morocco", "nigeria", "kenya", "south africa", "iceland", "serbia"];
-const titleCase = (c: string) => (c.length <= 3 ? c.toUpperCase() : c.replace(/\b\p{L}/gu, (m) => m.toUpperCase()));
+export const US_STATES = ["alabama", "alaska", "arizona", "arkansas", "california", "colorado", "connecticut", "delaware", "florida", "georgia", "hawaii", "idaho", "illinois", "indiana", "iowa", "kansas", "kentucky", "louisiana", "maine", "maryland", "massachusetts", "michigan", "minnesota", "mississippi", "missouri", "montana", "nebraska", "nevada", "new hampshire", "new jersey", "new mexico", "new york", "north carolina", "north dakota", "ohio", "oklahoma", "oregon", "pennsylvania", "rhode island", "south carolina", "south dakota", "tennessee", "texas", "utah", "vermont", "virginia", "washington", "west virginia", "wisconsin", "wyoming", "puerto rico"];
+export const NOT_YET = ["turkey", "türkiye", "turkiye", "mexico", "brazil", "argentina", "chile", "colombia", "peru", "india", "pakistan", "bangladesh", "china", "hong kong", "taiwan", "south korea", "korea", "indonesia", "malaysia", "thailand", "vietnam", "philippines", "russia", "ukraine", "israel", "saudi arabia", "qatar", "kuwait", "egypt", "morocco", "nigeria", "kenya", "south africa", "iceland", "serbia"];
+export const titleCase = (c: string) => (c.length <= 3 ? c.toUpperCase() : c.replace(/\b\p{L}/gu, (m) => m.toUpperCase()));
 
-const HUMAN = /\b(human|agent|representative|operator|real person|a person|someone real|live (chat|support)|talk to (someone|somebody|support|the team|a person)|speak (to|with))\b/i;
-const ORDER_NO = /\bNF[-\s]?(\d{5})\b/i;
+export const HUMAN = /\b(human|agent|representative|operator|real person|a person|someone real|live (chat|support)|talk to (someone|somebody|support|the team|a person)|speak (to|with))\b/i;
+export const ORDER_NO = /\bNF[-\s]?(\d{5})\b/i;
 const MY_ORDER = /\bmy (order|package|parcel|delivery|shipment)\b/i;
 
 export const fold = (s: string) =>
@@ -720,7 +720,13 @@ export function createEngine(articles: Article[], synonymGroups: SynonymGroup[])
     return { ...base, kind: "answer", confidence, text: compose(top.c, analysis.terms), citations, matched: top.matched.map((t) => analysis.surface[t] ?? t), signals, notes };
   }
 
-  return { analyse, search, searchArticles, answer, explain, chunkCount: chunks.length };
+  /** The citation for a named section of an article, for answers composed by policy rules. */
+  function citation(articleId: string, heading?: RegExp): Citation | undefined {
+    const c = chunks.find((x) => x.article.id === articleId && (heading ? heading.test(x.heading ?? "") : true));
+    return c && cite(c);
+  }
+
+  return { analyse, search, searchArticles, answer, explain, citation, chunkCount: chunks.length };
 }
 
 export type Engine = ReturnType<typeof createEngine>;

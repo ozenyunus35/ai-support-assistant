@@ -13,6 +13,7 @@ import { ChatWidget, articleHref, openChat, sectionSlug } from "./chat-widget";
 import { RichText } from "./rich-text";
 import { ThemeToggle } from "./theme-toggle";
 import { Spinner, cx } from "./ui";
+import { DemoGuide } from "./demo-guide";
 import { StorageNotice } from "./storage-notice";
 
 const ICONS: Record<Category, React.ComponentType<{ className?: string }>> = {
@@ -36,10 +37,11 @@ function DemoBar() {
   return (
     <div className="border-b border-border bg-surface-2">
       <div className="mx-auto flex h-9 max-w-6xl items-center gap-3 px-4 text-xs text-muted sm:px-6">
-        <span className="truncate">
+        <span className="truncate max-[420px]:hidden">
           <span className="font-medium text-text">Relay demo.</span> Northfold is a fictional store. <span className="hidden md:inline">The chat assistant answers from this help center, right in your browser.</span>
         </span>
-        <Link href="/admin/" className="ml-auto inline-flex shrink-0 items-center gap-1 font-medium text-text hover:text-accent">
+        <DemoGuide className="ml-auto shrink-0 text-text max-[420px]:mr-auto max-[420px]:ml-0" />
+        <Link href="/admin/" className="inline-flex shrink-0 items-center gap-1 font-medium text-text hover:text-accent">
           Open admin console <ArrowRight className="size-3.5" aria-hidden />
         </Link>
       </div>

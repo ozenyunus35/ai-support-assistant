@@ -72,7 +72,7 @@ Check around the delivery address and with neighbors, and wait until the end of 
     body: `You can change or cancel an order within 60 minutes of placing it. Open the order from your confirmation email or under Account, then Orders, and choose Edit order or Cancel order.
 
 ## After the first hour
-Once an order is being packed we can no longer change the address, the items or the shipping speed. You can still return anything you don't want once it arrives, free of charge for US orders.
+Once an order is being packed we can no longer change the address, the items or the shipping speed. You can still return anything you don't want once it arrives. Return labels are free for exchanges and store credit; for a refund to your card, $6 is deducted for the label, and international customers pay their own return shipping (see How to start a return).
 
 ## Wrong shipping address
 If the order has already shipped, reply to the shipping email straight away. We will ask the carrier to redirect the parcel, which usually works for Standard and Express deliveries.`,

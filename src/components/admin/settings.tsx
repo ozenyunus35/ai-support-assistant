@@ -24,7 +24,7 @@ function Form({ state }: { state: DemoState }) {
   const set = <K extends keyof SettingsType>(k: K, v: SettingsType[K]) => setS((x) => ({ ...x, [k]: v }));
   const dirty = JSON.stringify(s) !== JSON.stringify(state.settings);
 
-  // Confidence the assistant had for every first question in the last 30 days, to preview the threshold.
+  // Retrieval match the assistant had for every first question in the last 30 days, to preview the threshold.
   const confidences = useMemo(() => {
     const engine = engineFor(state);
     const from = now - 30 * 86_400_000;
@@ -80,7 +80,7 @@ function Form({ state }: { state: DemoState }) {
             <div>
               <div className="flex items-baseline justify-between">
                 <label htmlFor="threshold" className="text-xs font-medium text-muted">
-                  Confidence threshold
+                  Retrieval-match threshold
                 </label>
                 <span className="font-medium tabular-nums">{pct(s.threshold)}</span>
               </div>
@@ -88,9 +88,9 @@ function Form({ state }: { state: DemoState }) {
               <p className="mt-1 text-muted" data-testid="threshold-impact">
                 At {pct(s.threshold)}, <span className="font-medium text-text">{pct(share)}</span> of the answers the assistant gave in the last 30 days would have gone to a person instead.
               </p>
-              <p className="mt-1 text-xs text-faint">Lower means more automated answers; higher means fewer wrong ones. Questions outside the help center are handed off at any setting.</p>
+              <p className="mt-1 text-xs text-faint">Applies to answers found by searching the help center. Lower means more automated answers; higher means fewer wrong ones. Questions outside the help center are handed off at any setting. A customer who asks for a person always gets one, whatever the setting.</p>
             </div>
-            <Field label="Message when handing off">{(id) => <textarea id={id} rows={2} className={cx(inputClass, "h-auto py-2")} value={s.handoffMessage} onChange={(e) => set("handoffMessage", e.target.value)} />}</Field>
+            <Field label="Message when unsure">{(id) => <textarea id={id} rows={2} className={cx(inputClass, "h-auto py-2")} value={s.handoffMessage} onChange={(e) => set("handoffMessage", e.target.value)} />}</Field>
             <Field label="Reply time shown while waiting">{(id) => <input id={id} className={inputClass} value={s.replyTime} onChange={(e) => set("replyTime", e.target.value)} />}</Field>
           </div>
         </Card>
