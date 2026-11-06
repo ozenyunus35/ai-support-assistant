@@ -162,7 +162,7 @@ function Synonyms({ state }: { state: DemoState }) {
                 }
               }}
             />
-            <button onClick={() => setGroups((gs) => gs.filter((x) => x.id !== g.id))} className="ml-auto rounded-md p-1 text-faint hover:bg-surface-2 hover:text-text" aria-label={`Delete the ${g.terms[0]} group`}>
+            <button onClick={() => setGroups((gs) => gs.filter((x) => x.id !== g.id))} className="ml-auto rounded-md p-1 text-faint hover:bg-surface-2 hover:text-text" aria-label={t("Delete the {term} group", { term: g.terms[0] })}>
               <Trash2 className="size-3.5" />
             </button>
           </li>

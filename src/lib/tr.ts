@@ -138,6 +138,7 @@ export const TR: Record<string, string> = {
   "New synonym group": "Yeni eş anlamlı grubu",
   "New group, comma separated: refund, money back": "Yeni grup, virgülle ayırın: refund, money back",
   "Add group": "Grup ekle",
+  "Delete the {term} group": "{term} grubunu sil",
   "The articles the assistant answers from. Edits are re-indexed instantly, no training step.":
     "Asistanın cevap verirken kullandığı makaleler. Düzenlemeler anında yeniden dizinlenir, eğitim adımı yoktur.",
   Synonyms: "Eş anlamlılar",
