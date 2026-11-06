@@ -60,6 +60,8 @@ handoff queue, the knowledge base and how well the assistant is doing.
 | ![Widget](docs/widget.png) | ![Overview](docs/overview.png) |
 | **Inbox** | **Answer playground** |
 | ![Inbox](docs/inbox.png) | ![Playground](docs/playground.png) |
+| **Console in Turkish** | **Command palette** |
+| ![Answer playground in Turkish](docs/turkish.png) | ![Command palette searching articles and conversations](docs/palette.png) |
 
 <p align="center"><img src="docs/mobile.png" width="260" alt="Chat widget on a phone"></p>
 
