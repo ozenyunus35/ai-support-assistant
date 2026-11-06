@@ -11,7 +11,7 @@ import { useStore } from "@/lib/store";
 import { useNow } from "@/lib/use-now";
 import type { DayPoint } from "@/lib/stats";
 import { Avatar, Card, CardHeader, EmptyState, PageHeader, Sparkline, Spinner, cx } from "../ui";
-import { useT } from "@/lib/i18n";
+import { useLang, useT } from "@/lib/i18n";
 
 const SERIES = [
   { key: "ai", label: "Resolved by AI", color: "var(--accent)" },
@@ -20,14 +20,14 @@ const SERIES = [
 
 function Change({ current, previous, invert, format = "pct" }: { current: number; previous: number; invert?: boolean; format?: "pct" | "pts" }) {
   const t = useT();
+  const { lang } = useLang();
   const diff = format === "pts" ? Math.round((current - previous) * 100) : previous === 0 ? 0 : Math.round(((current - previous) / previous) * 100);
   const good = invert ? diff < 0 : diff > 0;
   return (
     <span className="text-xs whitespace-nowrap text-muted" title={t("Compared with the previous 30 days")}>
       <span className={cx("font-medium tabular-nums", diff === 0 ? "text-muted" : good ? "text-success" : "text-danger")}>
-        {diff > 0 ? "+" : ""}
-        {diff}
-        {format === "pts" ? ` ${t("pts")}` : "%"}
+        {diff > 0 ? "+" : diff < 0 ? "-" : ""}
+        {format === "pts" ? `${Math.abs(diff)} ${t("pts")}` : lang === "tr" ? `%${Math.abs(diff)}` : `${Math.abs(diff)}%`}
       </span>{" "}
       <span className="hidden xl:inline">{t("vs prior 30 days")}</span>
     </span>
