@@ -175,7 +175,7 @@ export function Playground() {
                 )}
                 <div>
                   <p className="text-muted">{t("Taken from earlier messages")}</p>
-                  <p className="mt-1 text-text" data-testid="dialog-context">{reply!.contextUsed.length ? reply!.contextUsed.join("; ") : turns.length ? "Nothing from the earlier messages applied to this one." : "Nothing: single message, no context."}</p>
+                  <p className="mt-1 text-text" data-testid="dialog-context">{reply!.contextUsed.length ? reply!.contextUsed.map((c) => translateKnown(lang, c)).join("; ") : t(turns.length ? "Nothing from the earlier messages applied to this one." : "Nothing: single message, no context.")}</p>
                 </div>
                 {reply!.missing.length > 0 && (
                   <div>
@@ -306,7 +306,7 @@ export function Playground() {
 
           <div className="space-y-3">
             <Card>
-              <CardHeader title={t("2 · Rank help center sections")} meta={`${engineFor(state).chunkCount} sections indexed`} />
+              <CardHeader title={t("2 · Rank help center sections")} meta={t("{n} sections indexed", { n: engineFor(state).chunkCount })} />
               {x.hits.length === 0 ? (
                 <EmptyState icon={FlaskConical} title={t("No section matches")} text={t("None of the search terms appear in the help center.")} />
               ) : (
