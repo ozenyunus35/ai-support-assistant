@@ -239,11 +239,11 @@ function Detail({ c, state, onBack }: { c: Conversation; state: DemoState; onBac
               rows={3}
               maxLength={MAX_MESSAGE}
               aria-label={t("Reply")}
-              placeholder={`Reply to ${c.customer.name.split(" ")[0]}…`}
+              placeholder={t("Reply to {name}…", { name: c.customer.name.split(" ")[0] })}
               className="block w-full resize-none bg-transparent px-3 py-2 text-[13px] placeholder:text-faint focus:outline-none"
             />
             <div className="flex items-center justify-between gap-2 px-2 pb-2">
-              <span className="hidden pl-1 text-[11px] text-faint sm:inline">{draft.length > MAX_MESSAGE - 200 ? `${draft.length}/${MAX_MESSAGE}` : "⌘ Enter to send"}</span>
+              <span className="hidden pl-1 text-[11px] text-faint sm:inline">{draft.length > MAX_MESSAGE - 200 ? `${draft.length}/${MAX_MESSAGE}` : t("⌘ Enter to send")}</span>
               <Button variant="primary" size="sm" onClick={send} disabled={!draft.trim()} className="ml-auto">
                 <CornerDownLeft /> {t("Send reply")}
               </Button>
@@ -317,7 +317,7 @@ export function Inbox() {
               {list.length > limit && (
                 <li className="p-3 text-center">
                   <Button size="sm" variant="ghost" onClick={() => setLimit((l) => l + 40)}>
-                    Show more ({list.length - limit})
+                    {t("Show more ({n})", { n: list.length - limit })}
                   </Button>
                 </li>
               )}

@@ -7,7 +7,7 @@ import { pct } from "@/lib/format";
 import { engineFor, useStore } from "@/lib/store";
 import { RichText } from "../rich-text";
 import { Card, CardHeader, EmptyState, PageHeader, Spinner, cx, inputClass } from "../ui";
-import { useT } from "@/lib/i18n";
+import { translateKnown, useLang, useT } from "@/lib/i18n";
 
 const EXAMPLES = ["can i get my money back if the tent is used", "refnd for a retrun", "my zipper broke", "do you sell kayaks?", "Where is my order NF-20517?", "how much is express shipping", "hw do u send my order back pls"];
 const MULTI = ["Do you ship to Canada and can I return a used tent after 45 days?", "The tent arrived 31 days ago. Can I still return it?", "Do not track NF-20481. Tell me your return policy."];
@@ -50,6 +50,7 @@ function Step({ n, title, children }: { n: number; title: string; children: Reac
 
 export function Playground() {
   const t = useT();
+  const { lang } = useLang();
   const state = useStore();
   const [q, setQ] = useState(EXAMPLES[0]);
   // Earlier messages of the same conversation. The context they leave behind is what the next message is read with.
@@ -140,7 +141,7 @@ export function Playground() {
         <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
           <div className="space-y-3">
             <Card>
-              <CardHeader title={t("Conversation layer")} meta={`${reply!.total} request${reply!.total === 1 ? "" : "s"} found · ${reply!.covered} covered`} />
+              <CardHeader title={t("Conversation layer")} meta={t(reply!.total === 1 ? "{n} request found · {covered} covered" : "{n} requests found · {covered} covered", { n: reply!.total, covered: reply!.covered })} />
               <div className="space-y-3 p-4 text-xs" data-testid="dialog-layer">
                 <div>
                   <p className="text-muted">{t("Requests and their intent")}</p>
@@ -152,7 +153,7 @@ export function Playground() {
                           <span className="text-faint"> · {t(STATUS_LABEL[p.status])} · {p.method === "retrieval" ? t("retrieval match {pct}", { pct: pct(p.confidence ?? 0) }) : p.method === "rule" ? t("policy rule") : t(p.method)}</span>
                         </p>
                         <p className="mt-0.5 truncate text-faint">“{p.request.trim()}”</p>
-                        {p.rule && <p className="mt-0.5 text-muted">{t("Rule:")} {p.rule}</p>}
+                        {p.rule && <p className="mt-0.5 text-muted">{t("Rule:")} {translateKnown(lang, p.rule)}</p>}
                         {p.missing?.length ? <p className="mt-0.5 text-warning">{t("Missing:")} {p.missing.map((m) => t(m)).join(", ")}</p> : null}
                       </li>
                     ))}

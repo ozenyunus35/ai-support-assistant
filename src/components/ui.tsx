@@ -37,12 +37,12 @@ export function Card({ className, ...props }: React.HTMLAttributes<HTMLDivElemen
 /** Card header row: title on the left, optional meta or link on the right. */
 export function CardHeader({ title, meta, icon: Icon }: { title: string; meta?: React.ReactNode; icon?: React.ComponentType<{ className?: string }> }) {
   return (
-    <div className="flex h-11 items-center justify-between gap-3 border-b border-border px-4">
+    <div className="flex min-h-11 items-center justify-between gap-3 border-b border-border px-4 py-2">
       <h2 className="flex items-center gap-2 text-[13px] font-medium">
         {Icon && <Icon className="size-3.5 text-muted" aria-hidden />}
         {title}
       </h2>
-      {meta && <div className="shrink-0 text-xs text-muted">{meta}</div>}
+      {meta && <div className="min-w-0 text-right text-xs text-muted">{meta}</div>}
     </div>
   );
 }
@@ -189,7 +189,7 @@ export function Sparkline({ data, className, color = "var(--accent)" }: { data: 
   const max = Math.max(1, ...data);
   const line = data.map((v, i) => `${i ? "L" : "M"}${((i / (data.length - 1)) * w).toFixed(1)},${(h - 2 - (v / max) * (h - 4)).toFixed(1)}`).join(" ");
   return (
-    <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className={cx("h-7 w-full overflow-visible", className)} aria-hidden>
+    <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className={cx("h-7 overflow-visible", className ?? "w-full")} aria-hidden>
       <path d={line} fill="none" stroke={color} strokeWidth="1.25" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
     </svg>
   );

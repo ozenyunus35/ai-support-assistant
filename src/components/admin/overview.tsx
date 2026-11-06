@@ -23,7 +23,7 @@ function Change({ current, previous, invert, format = "pct" }: { current: number
   const diff = format === "pts" ? Math.round((current - previous) * 100) : previous === 0 ? 0 : Math.round(((current - previous) / previous) * 100);
   const good = invert ? diff < 0 : diff > 0;
   return (
-    <span className="text-xs text-muted" title={t("Compared with the previous 30 days")}>
+    <span className="text-xs whitespace-nowrap text-muted" title={t("Compared with the previous 30 days")}>
       <span className={cx("font-medium tabular-nums", diff === 0 ? "text-muted" : good ? "text-success" : "text-danger")}>
         {diff > 0 ? "+" : ""}
         {diff}
@@ -111,7 +111,7 @@ export function Overview() {
             title={t("Conversations per day")}
             icon={BarChart3}
             meta={
-              <span className="flex items-center gap-3">
+              <span className="flex flex-wrap items-center justify-end gap-x-3 gap-y-0.5">
                 {SERIES.map((s) => (
                   <span key={s.key} className="inline-flex items-center gap-1.5">
                     <span className="size-2 rounded-[2px]" style={{ background: s.color }} aria-hidden />

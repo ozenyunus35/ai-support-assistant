@@ -273,7 +273,7 @@ export function KnowledgeBase() {
                         <button className="block max-w-full truncate text-left font-medium hover:text-accent" onClick={() => setEditing(a)}>
                           {a.title}
                         </button>
-                        <p className="truncate text-xs text-faint">{sections(a.body).length} sections</p>
+                        <p className="truncate text-xs text-faint">{t("{n} sections", { n: sections(a.body).length })}</p>
                       </td>
                       <td className="hidden px-3 py-2.5 text-muted md:table-cell">{t(CATEGORIES[a.category].label)}</td>
                       <td className="px-3 py-2.5 text-right tabular-nums">{cited.get(a.id) ?? 0}</td>
