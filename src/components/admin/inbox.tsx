@@ -12,6 +12,7 @@ import type { Conversation, ConversationStatus, DemoState, Message } from "@/lib
 import { RichText } from "../rich-text";
 import { useToast } from "../toast";
 import { Avatar, Badge, Button, Card, EmptyState, PageHeader, Spinner, cx, type Tone } from "../ui";
+import { useT } from "@/lib/i18n";
 
 const VIEWS = [
   { key: "all", label: "All" },
@@ -37,14 +38,16 @@ const inView = (c: Conversation, v: View) =>
   (v === "team" && c.status === "resolved" && c.resolvedBy === "agent");
 
 function StatusBadge({ c }: { c: Conversation }) {
+  const t = useT();
   const s = STATUS[c.status];
-  return <Badge tone={s.tone}>{c.status === "resolved" ? (c.resolvedBy === "ai" ? "Resolved by AI" : "Resolved by team") : s.label}</Badge>;
+  return <Badge tone={s.tone}>{c.status === "resolved" ? (c.resolvedBy === "ai" ? t("Resolved by AI") : t("Resolved by team")) : t(s.label)}</Badge>;
 }
 
 function ListItem({ c, active, onSelect }: { c: Conversation; active: boolean; onSelect: () => void }) {
+  const t = useT();
   const now = useNow();
   const last = c.messages[c.messages.length - 1];
-  const prefix = last?.role === "customer" ? "" : last?.role === "agent" ? "You: " : "AI: ";
+  const prefix = last?.role === "customer" ? "" : last?.role === "agent" ? t("You: ") : t("AI: ");
   return (
     <li>
       <button onClick={onSelect} aria-current={active ? "true" : undefined} className={cx("flex w-full items-start gap-3 border-l-2 px-3.5 py-3 text-left transition-colors", active ? "border-accent bg-surface-2" : "border-transparent hover:bg-surface-2")}>
@@ -52,16 +55,16 @@ function ListItem({ c, active, onSelect }: { c: Conversation; active: boolean; o
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <span className="truncate font-medium">{c.customer.name}</span>
-            {c.live && <span className="shrink-0 rounded border border-accent/40 px-1 text-[10px] font-medium text-accent">Live</span>}
+            {c.live && <span className="shrink-0 rounded border border-accent/40 px-1 text-[10px] font-medium text-accent">{t("Live")}</span>}
             <span className="ml-auto shrink-0 text-xs text-faint">{timeAgo(c.updatedAt, now)}</span>
           </div>
           <p className="mt-0.5 truncate text-muted">
             {prefix}
-            {last?.text || "Handed to the team"}
+            {last?.text || t("Handed to the team")}
           </p>
           <div className="mt-1.5 flex items-center gap-2">
             <StatusBadge c={c} />
-            {c.status === "needs-human" && c.handoffAt && <span className="text-xs text-warning tabular-nums">waiting {duration(now - Date.parse(c.handoffAt))}</span>}
+            {c.status === "needs-human" && c.handoffAt && <span className="text-xs text-warning tabular-nums">{t("waiting {time}", { time: duration(now - Date.parse(c.handoffAt)) })}</span>}
           </div>
         </div>
       </button>
@@ -70,6 +73,7 @@ function ListItem({ c, active, onSelect }: { c: Conversation; active: boolean; o
 }
 
 function Bubble({ m, state, threshold }: { m: Message; state: DemoState; threshold: number }) {
+  const t = useT();
   if (m.role === "customer")
     return (
       <div className="flex max-w-[85%] flex-col items-start">
@@ -83,7 +87,7 @@ function Bubble({ m, state, threshold }: { m: Message; state: DemoState; thresho
       <div className="ml-auto flex max-w-[85%] flex-col items-end">
         <p className="rounded-2xl rounded-tr-md bg-accent px-3 py-2 whitespace-pre-wrap text-accent-fg">{m.text}</p>
         <span className="mt-1 text-[11px] text-faint">
-          {agent?.name ?? "Team"} · {formatTime(m.at)}
+          {agent?.name ?? t("Team")} · {formatTime(m.at)}
         </span>
       </div>
     );
@@ -94,24 +98,24 @@ function Bubble({ m, state, threshold }: { m: Message; state: DemoState; thresho
     <div className="ml-auto flex max-w-[85%] flex-col items-end">
       <div className={cx("rounded-2xl rounded-tr-md border px-3 py-2", handoff ? "border-warning/40 bg-warning-soft" : "border-border bg-surface")}>
         <p className="mb-1 flex items-center gap-1.5 text-[11px] font-medium text-muted">
-          <Sparkles className="size-3" aria-hidden /> {handoff ? "AI handed off" : "AI answer"}
+          <Sparkles className="size-3" aria-hidden /> {handoff ? t("AI handed off") : t("AI answer")}
           {a && a.kind !== "greeting" && a.kind !== "thanks" && !(a.kind === "handoff" && a.confidence === 1 && !a.handoffReason) && (
             <span className={cx("font-normal tabular-nums", a.method !== "rule" && a.confidence < threshold ? "text-warning" : "text-faint")}>
-              · {a.method === "rule" ? "policy rule" : `retrieval match ${pct(a.confidence)}`}
-              {a.total && a.total > 1 ? ` · ${a.covered} of ${a.total} requests` : ""}
-              {a.kind === "handoff" && a.handoffReason ? ` · ${a.handoffReason === "requested" ? "customer asked for a person" : "not enough information"}` : ""}
+              · {a.method === "rule" ? t("policy rule") : t("retrieval match {pct}", { pct: pct(a.confidence) })}
+              {a.total && a.total > 1 ? ` · ${t("{n} of {total} requests", { n: a.covered ?? 0, total: a.total })}` : ""}
+              {a.kind === "handoff" && a.handoffReason ? ` · ${a.handoffReason === "requested" ? t("customer asked for a person") : t("not enough information")}` : ""}
             </span>
           )}
         </p>
         <RichText text={m.text} dense />
         {m.order && (
           <p className="mt-1.5 text-xs text-muted">
-            Order card: {m.order.number}, {m.order.status.replace(/-/g, " ")}
+            {t("Order card: {number}, {status}", { number: m.order.number, status: t(m.order.status.replace(/-/g, " ")) })}
           </p>
         )}
         {a && a.citations.length > 0 && (
           <p className="mt-1.5 text-xs text-muted">
-            {handoff ? "Closest article: " : "Sources: "}
+            {handoff ? t("Closest article: ") : t("Sources: ")}
             {a.citations.map((c) => c.title + (c.heading ? ` › ${c.heading}` : "")).join(", ")}
           </p>
         )}
@@ -119,12 +123,12 @@ function Bubble({ m, state, threshold }: { m: Message; state: DemoState; thresho
       <span className="mt-1 flex items-center gap-1.5 text-[11px] text-faint">
         {m.feedback === "up" && (
           <span className="inline-flex items-center gap-1 text-success">
-            <ThumbsUp className="size-3" aria-hidden /> Helpful
+            <ThumbsUp className="size-3" aria-hidden /> {t("Helpful")}
           </span>
         )}
         {m.feedback === "down" && (
           <span className="inline-flex items-center gap-1 text-danger">
-            <ThumbsDown className="size-3" aria-hidden /> Not helpful
+            <ThumbsDown className="size-3" aria-hidden /> {t("Not helpful")}
           </span>
         )}
         {formatTime(m.at)}
@@ -134,6 +138,7 @@ function Bubble({ m, state, threshold }: { m: Message; state: DemoState; thresho
 }
 
 function Detail({ c, state, onBack }: { c: Conversation; state: DemoState; onBack: () => void }) {
+  const t = useT();
   const [draft, setDraft] = useState("");
   const { toast } = useToast();
   const lastQuestion = [...c.messages].reverse().find((m) => m.role === "customer");
@@ -149,13 +154,13 @@ function Detail({ c, state, onBack }: { c: Conversation; state: DemoState; onBac
     if (!draft.trim()) return;
     sendAgentReply(c.id, draft.trim());
     setDraft("");
-    toast(c.live ? "Reply sent. It appears in the widget right away." : "Reply sent.");
+    toast(c.live ? t("Reply sent. It appears in the widget right away.") : t("Reply sent."));
   };
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex flex-wrap items-center gap-3 border-b border-border px-4 py-3">
-        <button onClick={onBack} className="rounded-md p-1 text-muted hover:bg-surface-2 lg:hidden" aria-label="Back to conversations">
+        <button onClick={onBack} className="rounded-md p-1 text-muted hover:bg-surface-2 lg:hidden" aria-label={t("Back to conversations")}>
           <ArrowLeft className="size-4" />
         </button>
         <Avatar name={c.customer.name} size={32} />
@@ -171,35 +176,35 @@ function Detail({ c, state, onBack }: { c: Conversation; state: DemoState; onBac
             size="sm"
             onClick={() => {
               resolveConversation(c.id);
-              toast("Conversation resolved.");
+              toast(t("Conversation resolved."));
             }}
           >
-            <Check /> Resolve
+            <Check /> {t("Resolve")}
           </Button>
         )}
       </div>
       <dl className="flex flex-wrap gap-x-6 gap-y-1 border-b border-border px-4 py-2 text-xs">
         <div className="flex gap-1.5">
-          <dt className="text-faint">Started</dt>
+          <dt className="text-faint">{t("Started")}</dt>
           <dd className="text-muted">{formatDateTime(c.startedAt)}</dd>
         </div>
         <div className="flex gap-1.5">
-          <dt className="text-faint">Topic</dt>
-          <dd className="text-muted">{c.topic ? CATEGORIES[c.topic].label : "Not in the help center"}</dd>
+          <dt className="text-faint">{t("Topic")}</dt>
+          <dd className="text-muted">{c.topic ? t(CATEGORIES[c.topic].label) : t("Not in the help center")}</dd>
         </div>
         {c.handoffAt && (
           <div className="flex gap-1.5">
-            <dt className="text-faint">Handed off</dt>
+            <dt className="text-faint">{t("Handed off")}</dt>
             <dd className="text-muted">{formatTime(c.handoffAt)}</dd>
           </div>
         )}
         <div className="flex gap-1.5">
-          <dt className="text-faint">Assignee</dt>
+          <dt className="text-faint">{t("Assignee")}</dt>
           <dd className="text-muted">{assignee?.name ?? "Unassigned"}</dd>
         </div>
       </dl>
 
-      <div className="flex-1 space-y-3 overflow-y-auto px-4 py-4" aria-label="Transcript">
+      <div className="flex-1 space-y-3 overflow-y-auto px-4 py-4" aria-label={t("Transcript")}>
         {c.messages.map((m) => (
           <Bubble key={m.id} m={m} state={state} threshold={state.settings.threshold} />
         ))}
@@ -212,12 +217,12 @@ function Detail({ c, state, onBack }: { c: Conversation; state: DemoState; onBac
               <Sparkles className="mt-0.5 size-3.5 shrink-0 text-accent" aria-hidden />
               <div className="min-w-0 flex-1">
                 <p className="text-xs text-muted">
-                  Suggested from <span className="text-text">{suggestion.citations[0].title}</span> · retrieval match {pct(suggestion.confidence)}
+                  {t("Suggested from")} <span className="text-text">{suggestion.citations[0].title}</span> · {t("retrieval match {pct}", { pct: pct(suggestion.confidence) })}
                 </p>
                 <p className="mt-0.5 line-clamp-2">{suggestion.text.replace(/\n- /g, " · ").replace(/^- /, "")}</p>
               </div>
               <Button size="sm" variant="ghost" onClick={() => setDraft(suggestion.text.replace(/\n- /g, "\n• ").replace(/^- /, "• "))}>
-                Use
+                {t("Use")}
               </Button>
             </div>
           )}
@@ -233,14 +238,14 @@ function Detail({ c, state, onBack }: { c: Conversation; state: DemoState; onBac
               }}
               rows={3}
               maxLength={MAX_MESSAGE}
-              aria-label="Reply"
+              aria-label={t("Reply")}
               placeholder={`Reply to ${c.customer.name.split(" ")[0]}…`}
               className="block w-full resize-none bg-transparent px-3 py-2 text-[13px] placeholder:text-faint focus:outline-none"
             />
             <div className="flex items-center justify-between gap-2 px-2 pb-2">
               <span className="hidden pl-1 text-[11px] text-faint sm:inline">{draft.length > MAX_MESSAGE - 200 ? `${draft.length}/${MAX_MESSAGE}` : "⌘ Enter to send"}</span>
               <Button variant="primary" size="sm" onClick={send} disabled={!draft.trim()} className="ml-auto">
-                <CornerDownLeft /> Send reply
+                <CornerDownLeft /> {t("Send reply")}
               </Button>
             </div>
           </div>
@@ -251,6 +256,7 @@ function Detail({ c, state, onBack }: { c: Conversation; state: DemoState; onBac
 }
 
 export function Inbox() {
+  const t = useT();
   const state = useStore();
   const params = useSearchParams();
   const router = useRouter();
@@ -276,15 +282,15 @@ export function Inbox() {
 
   return (
     <>
-      <PageHeader title="Inbox" description="Every chat from the widget. The assistant answers first; handoffs wait here for the team." />
+      <PageHeader title={t("Inbox")} description={t("Every chat from the widget. The assistant answers first; handoffs wait here for the team.")} />
       <Card className="flex h-[calc(100dvh-13rem)] min-h-[520px] overflow-hidden">
         <div className={cx("flex w-full min-w-0 flex-col border-border lg:w-[340px] lg:shrink-0 lg:border-r", selected && "max-lg:hidden")}>
           <div className="space-y-2 border-b border-border p-3">
             <div className="flex h-8 items-center gap-2 rounded-md border border-border bg-bg px-2.5 focus-within:border-accent">
               <Search className="size-3.5 text-faint" aria-hidden />
-              <input value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search conversations" placeholder="Search name or message" className="min-w-0 flex-1 bg-transparent placeholder:text-faint focus:outline-none" />
+              <input value={q} onChange={(e) => setQ(e.target.value)} aria-label={t("Search conversations")} placeholder={t("Search name or message")} className="min-w-0 flex-1 bg-transparent placeholder:text-faint focus:outline-none" />
             </div>
-            <div role="tablist" aria-label="Filter conversations" className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-0.5">
+            <div role="tablist" aria-label={t("Filter conversations")} className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-0.5">
               {VIEWS.map((v) => (
                 <button
                   key={v.key}
@@ -296,15 +302,15 @@ export function Inbox() {
                   }}
                   className={cx("h-6 shrink-0 rounded-md px-2 text-xs font-medium whitespace-nowrap transition-colors", view === v.key ? "bg-surface-3 text-text" : "text-muted hover:text-text")}
                 >
-                  {v.label} <span className="text-faint tabular-nums">{counts[v.key]}</span>
+                  {t(v.label)} <span className="text-faint tabular-nums">{counts[v.key]}</span>
                 </button>
               ))}
             </div>
           </div>
           {list.length === 0 ? (
-            <EmptyState icon={InboxIcon} title="No conversations" text={q ? "Nothing matches this search." : "Nothing in this view right now."} />
+            <EmptyState icon={InboxIcon} title={t("No conversations")} text={q ? t("Nothing matches this search.") : t("Nothing in this view right now.")} />
           ) : (
-            <ul className="flex-1 divide-y divide-border overflow-y-auto" aria-label="Conversations">
+            <ul className="flex-1 divide-y divide-border overflow-y-auto" aria-label={t("Conversations")}>
               {list.slice(0, limit).map((c) => (
                 <ListItem key={c.id} c={c} active={c.id === selected?.id} onSelect={() => select(c.id)} />
               ))}
@@ -319,7 +325,7 @@ export function Inbox() {
           )}
         </div>
         <div className={cx("min-w-0 flex-1 flex-col", selected ? "flex" : "hidden lg:flex")}>
-          {selected ? <Detail key={selected.id} c={selected} state={state} onBack={() => select(null)} /> : <EmptyState icon={InboxIcon} title="Select a conversation" text="Pick a chat on the left to read the transcript, see the assistant's confidence and sources, and reply." />}
+          {selected ? <Detail key={selected.id} c={selected} state={state} onBack={() => select(null)} /> : <EmptyState icon={InboxIcon} title={t("Select a conversation")} text={t("Pick a chat on the left to read the transcript, see the assistant's confidence and sources, and reply.")} />}
         </div>
       </Card>
     </>

@@ -7,6 +7,7 @@ import { pct } from "@/lib/format";
 import { engineFor, useStore } from "@/lib/store";
 import { RichText } from "../rich-text";
 import { Card, CardHeader, EmptyState, PageHeader, Spinner, cx, inputClass } from "../ui";
+import { useT } from "@/lib/i18n";
 
 const EXAMPLES = ["can i get my money back if the tent is used", "refnd for a retrun", "my zipper broke", "do you sell kayaks?", "Where is my order NF-20517?", "how much is express shipping", "hw do u send my order back pls"];
 const MULTI = ["Do you ship to Canada and can I return a used tent after 45 days?", "The tent arrived 31 days ago. Can I still return it?", "Do not track NF-20481. Tell me your return policy."];
@@ -48,6 +49,7 @@ function Step({ n, title, children }: { n: number; title: string; children: Reac
 }
 
 export function Playground() {
+  const t = useT();
   const state = useStore();
   const [q, setQ] = useState(EXAMPLES[0]);
   // Earlier messages of the same conversation. The context they leave behind is what the next message is read with.
@@ -69,8 +71,8 @@ export function Playground() {
   const conf = reply ? reply.confidence : 0;
   const sig = x?.reply.signals;
   const used = reply?.citations[0];
-  const decision = !reply ? "" : reply.handoff && reply.kind === "handoff" ? "Hand off to a person" : reply.kind === "order" ? "Look up the order" : reply.kind === "clarify" ? "Ask a follow-up question" : reply.kind === "greeting" ? "Small talk" : "Answer";
-  const handoffReason = reply?.handoffReason === "requested" ? "The customer asked for a person" : reply?.handoffReason === "low-confidence" ? "Not enough information: the retrieval match is below the threshold or the topic is outside the help center" : null;
+  const decision = !reply ? "" : reply.handoff && reply.kind === "handoff" ? t("Hand off to a person") : reply.kind === "order" ? t("Look up the order") : reply.kind === "clarify" ? t("Ask a follow-up question") : reply.kind === "greeting" ? t("Small talk") : t("Answer");
+  const handoffReason = reply?.handoffReason === "requested" ? t("The customer asked for a person") : reply?.handoffReason === "low-confidence" ? t("Not enough information: the retrieval match is below the threshold or the topic is outside the help center") : null;
   const send = (text: string) => {
     setTurns((t) => [...t, text]);
     setQ("");
@@ -78,13 +80,13 @@ export function Playground() {
 
   return (
     <>
-      <PageHeader title="Answer playground" description="Type a customer message and see each step the assistant takes: which requests it finds, which facts it keeps, which policy rule applies, what it takes from earlier messages, and, for what the rules don't cover, how it ranks help center sections with BM25." />
+      <PageHeader title={t("Answer playground")} description={t("Type a customer message and see each step the assistant takes: which requests it finds, which facts it keeps, which policy rule applies, what it takes from earlier messages, and, for what the rules don't cover, how it ranks help center sections with BM25.")} />
       <Card className="p-4">
         <label htmlFor="pg-q" className="text-xs font-medium text-muted">
-          Customer question
+          {t("Customer question")}
         </label>
         {turns.length > 0 && (
-          <ol className="mt-1.5 space-y-1 text-xs text-muted" data-testid="pg-turns" aria-label="Earlier messages in this conversation">
+          <ol className="mt-1.5 space-y-1 text-xs text-muted" data-testid="pg-turns" aria-label={t("Earlier messages in this conversation")}>
             {turns.map((t, i) => (
               <li key={i} className="truncate">
                 <span className="text-faint tabular-nums">{i + 1}. </span>
@@ -102,19 +104,19 @@ export function Playground() {
               if (e.key === "Enter" && q.trim() && turns.length) send(q);
             }}
             className={cx(inputClass, "h-10 text-[14px]")}
-            placeholder={turns.length ? "Next message in this conversation" : "Ask anything a customer might"}
+            placeholder={turns.length ? t("Next message in this conversation (in English)") : t("Ask anything a customer might (in English)")}
           />
           <button type="button" disabled={!q.trim()} onClick={() => send(q)} className="shrink-0 rounded-md border border-border px-3 text-xs text-muted transition-colors hover:text-text disabled:opacity-50" data-testid="pg-send">
-            Send, then add a follow-up
+            {t("Send, then add a follow-up")}
           </button>
           {turns.length > 0 && (
             <button type="button" onClick={() => setTurns([])} className="shrink-0 rounded-md border border-border px-3 text-xs text-muted transition-colors hover:text-text" data-testid="pg-reset">
-              New conversation
+              {t("New conversation")}
             </button>
           )}
         </div>
         <p className="mt-1.5 text-xs text-faint" data-testid="pg-mode">
-          {turns.length ? `Conversation mode: this message is read together with the ${turns.length} earlier one${turns.length > 1 ? "s" : ""}.` : "Single message: no earlier context is used. Use “Send, then add a follow-up” to try a conversation."}
+          {turns.length ? t(turns.length > 1 ? "Conversation mode: this message is read together with the {n} earlier ones." : "Conversation mode: this message is read together with the {n} earlier one.", { n: turns.length }) : t("Single message: no earlier context is used. Use “Send, then add a follow-up” to try a conversation.")}
         </p>
         <div className="mt-2.5 flex flex-wrap gap-1.5">
           {[...EXAMPLES, ...MULTI].map((e) => (
@@ -124,7 +126,7 @@ export function Playground() {
           ))}
           {CHAT.map((c) => (
             <button key={c.join("|")} onClick={() => { setTurns(c.slice(0, -1)); setQ(c[c.length - 1]); }} className="rounded-full border border-border px-2.5 py-0.5 text-xs text-muted transition-colors hover:text-text">
-              Conversation: {c.join(" → ")}
+              {t("Conversation: {flow}", { flow: c.join(" → ") })}
             </button>
           ))}
         </div>
@@ -132,57 +134,57 @@ export function Playground() {
 
       {!x || !reply ? (
         <Card className="mt-3">
-          <EmptyState icon={FlaskConical} title="Type a question to begin" />
+          <EmptyState icon={FlaskConical} title={t("Type a question to begin")} />
         </Card>
       ) : (
         <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
           <div className="space-y-3">
             <Card>
-              <CardHeader title="Conversation layer" meta={`${reply!.total} request${reply!.total === 1 ? "" : "s"} found · ${reply!.covered} covered`} />
+              <CardHeader title={t("Conversation layer")} meta={`${reply!.total} request${reply!.total === 1 ? "" : "s"} found · ${reply!.covered} covered`} />
               <div className="space-y-3 p-4 text-xs" data-testid="dialog-layer">
                 <div>
-                  <p className="text-muted">Requests and their intent</p>
+                  <p className="text-muted">{t("Requests and their intent")}</p>
                   <ul className="mt-1.5 space-y-1.5">
                     {reply!.parts.map((p, i) => (
                       <li key={i} className="rounded border border-border px-2 py-1.5" data-testid="dialog-part">
                         <p className="text-text">
-                          <span className="font-medium">{INTENT_LABEL[p.intent] ?? p.intent}</span>
-                          <span className="text-faint"> · {STATUS_LABEL[p.status]} · {p.method === "retrieval" ? `retrieval match ${pct(p.confidence ?? 0)}` : p.method === "rule" ? "policy rule" : p.method}</span>
+                          <span className="font-medium">{INTENT_LABEL[p.intent] ? t(INTENT_LABEL[p.intent]) : p.intent}</span>
+                          <span className="text-faint"> · {t(STATUS_LABEL[p.status])} · {p.method === "retrieval" ? t("retrieval match {pct}", { pct: pct(p.confidence ?? 0) }) : p.method === "rule" ? t("policy rule") : t(p.method)}</span>
                         </p>
                         <p className="mt-0.5 truncate text-faint">“{p.request.trim()}”</p>
-                        {p.rule && <p className="mt-0.5 text-muted">Rule: {p.rule}</p>}
-                        {p.missing?.length ? <p className="mt-0.5 text-warning">Missing: {p.missing.join(", ")}</p> : null}
+                        {p.rule && <p className="mt-0.5 text-muted">{t("Rule:")} {p.rule}</p>}
+                        {p.missing?.length ? <p className="mt-0.5 text-warning">{t("Missing:")} {p.missing.map((m) => t(m)).join(", ")}</p> : null}
                       </li>
                     ))}
                   </ul>
                 </div>
                 <div>
-                  <p className="text-muted">Facts kept from this message</p>
+                  <p className="text-muted">{t("Facts kept from this message")}</p>
                   <div className="mt-1.5 flex flex-wrap gap-1" data-testid="dialog-facts">
-                    {factChips(reply!.facts).length ? factChips(reply!.facts).map((f) => <Chip key={f} tone="accent">{f}</Chip>) : <span className="text-faint">None stated</span>}
+                    {factChips(reply!.facts).length ? factChips(reply!.facts).map((f) => <Chip key={f} tone="accent">{t(f)}</Chip>) : <span className="text-faint">{t("None stated")}</span>}
                   </div>
                 </div>
                 {reply!.negated.length > 0 && (
                   <div>
-                    <p className="text-muted">Said the customer does not mean</p>
+                    <p className="text-muted">{t("Said the customer does not mean")}</p>
                     <div className="mt-1.5 flex flex-wrap gap-1" data-testid="dialog-negated">
                       {reply!.negated.map((n) => <Chip key={n} tone="muted">{n}</Chip>)}
                     </div>
                   </div>
                 )}
                 <div>
-                  <p className="text-muted">Taken from earlier messages</p>
+                  <p className="text-muted">{t("Taken from earlier messages")}</p>
                   <p className="mt-1 text-text" data-testid="dialog-context">{reply!.contextUsed.length ? reply!.contextUsed.join("; ") : turns.length ? "Nothing from the earlier messages applied to this one." : "Nothing: single message, no context."}</p>
                 </div>
                 {reply!.missing.length > 0 && (
                   <div>
-                    <p className="text-muted">Still missing</p>
+                    <p className="text-muted">{t("Still missing")}</p>
                     <p className="mt-1 text-text" data-testid="dialog-missing">{reply!.missing.join("; ")}</p>
                   </div>
                 )}
                 {handoffReason && (
                   <div>
-                    <p className="text-muted">Why it was handed off</p>
+                    <p className="text-muted">{t("Why it was handed off")}</p>
                     <p className="mt-1 text-text" data-testid="dialog-handoff">{handoffReason}</p>
                   </div>
                 )}
@@ -190,15 +192,15 @@ export function Playground() {
             </Card>
 
             <Card>
-              <CardHeader title="1 · Understand the words" meta="retrieval path" />
+              <CardHeader title={t("1 · Understand the words")} meta={t("retrieval path")} />
               <ol className="space-y-4 p-4">
-                <Step n={1} title="Normalise phrasing">
-                  {x.analysis.rephrased ? <span className="text-xs text-text" data-testid="rephrased">{x.analysis.rephrased}</span> : <span className="text-xs text-faint">Nothing to rewrite</span>}
+                <Step n={1} title={t("Normalise phrasing")}>
+                  {x.analysis.rephrased ? <span className="text-xs text-text" data-testid="rephrased">{x.analysis.rephrased}</span> : <span className="text-xs text-faint">{t("Nothing to rewrite")}</span>}
                 </Step>
-                <Step n={2} title="Drop filler words">
-                  {x.analysis.dropped.length ? x.analysis.dropped.map((w, i) => <Chip key={w + i} tone="muted">{w}</Chip>) : <span className="text-xs text-faint">Nothing to drop</span>}
+                <Step n={2} title={t("Drop filler words")}>
+                  {x.analysis.dropped.length ? x.analysis.dropped.map((w, i) => <Chip key={w + i} tone="muted">{w}</Chip>) : <span className="text-xs text-faint">{t("Nothing to drop")}</span>}
                 </Step>
-                <Step n={3} title="Fix spelling">
+                <Step n={3} title={t("Fix spelling")}>
                   {x.analysis.corrections.length ? (
                     x.analysis.corrections.map((c) => (
                       <span key={c.from} className="inline-flex items-center gap-1">
@@ -208,10 +210,10 @@ export function Playground() {
                       </span>
                     ))
                   ) : (
-                    <span className="text-xs text-faint">No typos found</span>
+                    <span className="text-xs text-faint">{t("No typos found")}</span>
                   )}
                 </Step>
-                <Step n={4} title="Map customer wording">
+                <Step n={4} title={t("Map customer wording")}>
                   {x.analysis.synonyms.length ? (
                     x.analysis.synonyms.map((c) => (
                       <span key={c.from} className="inline-flex items-center gap-1">
@@ -221,17 +223,17 @@ export function Playground() {
                       </span>
                     ))
                   ) : (
-                    <span className="text-xs text-faint">No synonyms used</span>
+                    <span className="text-xs text-faint">{t("No synonyms used")}</span>
                   )}
                 </Step>
-                <Step n={5} title="Search terms">
-                  {x.analysis.terms.length ? [...new Set(x.analysis.terms)].map((t) => <Chip key={t} tone="accent">{t.replace(/_/g, " ")}</Chip>) : <span className="text-xs text-faint">No search terms left</span>}
+                <Step n={5} title={t("Search terms")}>
+                  {x.analysis.terms.length ? [...new Set(x.analysis.terms)].map((t) => <Chip key={t} tone="accent">{t.replace(/_/g, " ")}</Chip>) : <span className="text-xs text-faint">{t("No search terms left")}</span>}
                 </Step>
               </ol>
             </Card>
 
             <Card>
-              <CardHeader title="3 · Decide" />
+              <CardHeader title={t("3 · Decide")} />
               <div className="p-4">
                 <div className="flex items-baseline justify-between">
                   {retrieved ? (
@@ -239,8 +241,8 @@ export function Playground() {
                       {pct(conf)}
                     </p>
                   ) : (
-                    <p className="text-[20px] leading-none font-semibold tracking-[-0.02em]" aria-label="Decided by policy rule">
-                      Policy rule
+                    <p className="text-[20px] leading-none font-semibold tracking-[-0.02em]" aria-label={t("Decided by policy rule")}>
+                      {t("Policy rule")}
                     </p>
                   )}
                   <p className={cx("font-medium", reply!.kind === "handoff" ? "text-warning" : "text-success")} data-testid="decision">
@@ -248,7 +250,7 @@ export function Playground() {
                   </p>
                 </div>
                 <p className="mt-1.5 text-xs text-faint">
-                  {retrieved ? "Retrieval match: how well the best help center section fits the question. It is not the chance that the answer is right." : "No help center search was needed: the facts and a policy rule decided the answer."}
+                  {retrieved ? t("Retrieval match: how well the best help center section fits the question. It is not the chance that the answer is right.") : t("No help center search was needed: the facts and a policy rule decided the answer.")}
                 </p>
                 {retrieved && (
                   <div className="relative mt-3 h-1.5 rounded-full bg-surface-3">
@@ -256,35 +258,35 @@ export function Playground() {
                     <span className="absolute -top-1 h-3.5 w-px bg-text" style={{ left: pct(threshold) }} aria-hidden />
                   </div>
                 )}
-                {retrieved && <p className="mt-1.5 text-xs text-faint">Handoff threshold {pct(threshold)} (change it in Settings)</p>}
+                {retrieved && <p className="mt-1.5 text-xs text-faint">{t("Handoff threshold {pct} (change it in Settings)", { pct: pct(threshold) })}</p>}
                 <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-border pt-3 text-xs">
                   <div>
-                    <dt className="text-muted">Coverage</dt>
+                    <dt className="text-muted">{t("Coverage")}</dt>
                     <dd className="mt-0.5 font-medium tabular-nums">{pct(sig?.coverage ?? x.coverage)}</dd>
-                    <dd className="text-faint">of the question the best article talks about</dd>
+                    <dd className="text-faint">{t("of the question the best article talks about")}</dd>
                   </div>
                   <div>
-                    <dt className="text-muted">Match strength</dt>
+                    <dt className="text-muted">{t("Match strength")}</dt>
                     <dd className="mt-0.5 font-medium tabular-nums">{pct(sig?.strength ?? x.strength)}</dd>
-                    <dd className="text-faint">BM25 score of the best section, scaled</dd>
+                    <dd className="text-faint">{t("BM25 score of the best section, scaled")}</dd>
                   </div>
                   {sig && (
                     <>
                       <div>
-                        <dt className="text-muted">Lead</dt>
+                        <dt className="text-muted">{t("Lead")}</dt>
                         <dd className="mt-0.5 font-medium tabular-nums">{Math.exp(sig.margin).toFixed(1)}×</dd>
-                        <dd className="text-faint">score of the next best article</dd>
+                        <dd className="text-faint">{t("score of the next best article")}</dd>
                       </div>
                       <div>
-                        <dt className="text-muted">Intent</dt>
+                        <dt className="text-muted">{t("Intent")}</dt>
                         <dd className="mt-0.5 font-medium">{sig.intent > 0 ? "Matched" : sig.intent < 0 ? "Missed" : "None stated"}</dd>
-                        <dd className="text-faint">{pct(sig.unknown)} of words not in the help center</dd>
+                        <dd className="text-faint">{t("{pct} of words not in the help center", { pct: pct(sig.unknown) })}</dd>
                       </div>
                     </>
                   )}
                 </dl>
                 <div className="mt-3 border-t border-border pt-3 text-xs" data-testid="rules">
-                  <p className="text-muted">Rules applied</p>
+                  <p className="text-muted">{t("Rules applied")}</p>
                   {reply!.notes.length ? (
                     <ul className="mt-1.5 space-y-1">
                       {reply!.notes.map((n) => (
@@ -294,7 +296,7 @@ export function Playground() {
                       ))}
                     </ul>
                   ) : (
-                    <p className="mt-1 text-faint">None, the top section and its score were used as they are.</p>
+                    <p className="mt-1 text-faint">{t("None, the top section and its score were used as they are.")}</p>
                   )}
                 </div>
               </div>
@@ -303,9 +305,9 @@ export function Playground() {
 
           <div className="space-y-3">
             <Card>
-              <CardHeader title="2 · Rank help center sections" meta={`${engineFor(state).chunkCount} sections indexed`} />
+              <CardHeader title={t("2 · Rank help center sections")} meta={`${engineFor(state).chunkCount} sections indexed`} />
               {x.hits.length === 0 ? (
-                <EmptyState icon={FlaskConical} title="No section matches" text="None of the search terms appear in the help center." />
+                <EmptyState icon={FlaskConical} title={t("No section matches")} text={t("None of the search terms appear in the help center.")} />
               ) : (
                 <ol className="divide-y divide-border">
                   {x.hits.map((h, i) => (
@@ -318,7 +320,7 @@ export function Playground() {
                         </p>
                         {used && used.articleId === h.articleId && (used.heading ?? null) === (h.heading ?? null) && (
                           <span className="shrink-0 rounded-full bg-accent/15 px-1.5 text-[11px] font-medium text-accent" data-testid="used-section">
-                            {reply!.kind === "handoff" ? "Closest" : "Used"}
+                            {reply!.kind === "handoff" ? t("Closest") : t("Used")}
                           </span>
                         )}
                         <span className="shrink-0 font-mono text-xs text-muted tabular-nums">{h.score.toFixed(2)}</span>
@@ -338,7 +340,7 @@ export function Playground() {
             </Card>
 
             <Card>
-              <CardHeader title="4 · Reply the customer sees" />
+              <CardHeader title={t("4 · Reply the customer sees")} />
               <div className="p-4">
                 {reply!.kind === "handoff" ? (
                   <p className="text-muted">{reply!.handoffReason === "requested" ? HANDOFF_REQUESTED : state.settings.handoffMessage}</p>
@@ -347,12 +349,12 @@ export function Playground() {
                 )}
                 {reply!.order && (
                   <p className="mt-2 text-xs text-muted">
-                    + order card for {reply!.order.number} ({reply!.order.status.replace(/-/g, " ")})
+                    {t("+ order card for {number} ({status})", { number: reply!.order.number, status: t(reply!.order.status.replace(/-/g, " ")) })}
                   </p>
                 )}
                 {reply!.citations.length > 0 && (
                   <p className="mt-3 text-xs text-muted">
-                    {reply!.kind === "handoff" ? "Closest article, not shown to the customer: " : "Sources: "}
+                    {reply!.kind === "handoff" ? t("Closest article, not shown to the customer: ") : t("Sources: ")}
                     {reply!.citations.map((c) => c.title + (c.heading ? ` › ${c.heading}` : "")).join(", ")}
                   </p>
                 )}

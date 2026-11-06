@@ -51,6 +51,9 @@ handoff queue, the knowledge base and how well the assistant is doing.
   the retrieval match and the reply.
 - Settings: greeting, suggested questions, the message shown when the assistant is unsure and a threshold slider that shows how many of the last
   30 days' answers would have gone to a person at that setting.
+- English and Turkish console: every page, chart, status and message, with dates and percentages in the matching style. The store's help center and the assistant's replies stay in English, since Northfold is an English-speaking store.
+- A ⌘K command palette: jump to any page, open any article for editing or any conversation (it searches what customers wrote), reset the demo, switch theme or language.
+- Links to a single conversation (`/admin/inbox/?c=…`) or article (`/admin/knowledge/?a=…`).
 
 | Help center + widget | Overview |
 | --- | --- |

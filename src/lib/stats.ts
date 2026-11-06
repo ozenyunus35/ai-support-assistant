@@ -1,4 +1,5 @@
 import type { Category, Conversation, DemoState } from "./types";
+import { uiLang } from "./format";
 
 const DAY = 86_400_000;
 
@@ -77,7 +78,7 @@ export function overview(state: DemoState, now = Date.now(), days = 30) {
   for (let i = days - 1; i >= 0; i--) {
     const d = new Date(today - i * DAY);
     const key = d.toISOString().slice(0, 10);
-    byDay.set(key, { day: key, label: d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" }), ai: 0, human: 0 });
+    byDay.set(key, { day: key, label: d.toLocaleDateString(uiLang() === "tr" ? "tr-TR" : "en-US", { month: "short", day: "numeric", timeZone: "UTC" }), ai: 0, human: 0 });
   }
   for (const c of current) {
     const p = byDay.get(c.startedAt.slice(0, 10));

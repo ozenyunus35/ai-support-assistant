@@ -4,13 +4,14 @@ import { ArrowRight, BarChart3, Clock, Lightbulb, Tags } from "lucide-react";
 import Link from "next/link";
 import { useMemo } from "react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { duration, pct, timeAgo } from "@/lib/format";
+import { duration, formatNumber, pct, timeAgo } from "@/lib/format";
 import { CATEGORIES } from "@/lib/kb";
 import { overview } from "@/lib/stats";
 import { useStore } from "@/lib/store";
 import { useNow } from "@/lib/use-now";
 import type { DayPoint } from "@/lib/stats";
 import { Avatar, Card, CardHeader, EmptyState, PageHeader, Sparkline, Spinner, cx } from "../ui";
+import { useT } from "@/lib/i18n";
 
 const SERIES = [
   { key: "ai", label: "Resolved by AI", color: "var(--accent)" },
@@ -18,16 +19,17 @@ const SERIES = [
 ] as const;
 
 function Change({ current, previous, invert, format = "pct" }: { current: number; previous: number; invert?: boolean; format?: "pct" | "pts" }) {
+  const t = useT();
   const diff = format === "pts" ? Math.round((current - previous) * 100) : previous === 0 ? 0 : Math.round(((current - previous) / previous) * 100);
   const good = invert ? diff < 0 : diff > 0;
   return (
-    <span className="text-xs text-muted" title="Compared with the previous 30 days">
+    <span className="text-xs text-muted" title={t("Compared with the previous 30 days")}>
       <span className={cx("font-medium tabular-nums", diff === 0 ? "text-muted" : good ? "text-success" : "text-danger")}>
         {diff > 0 ? "+" : ""}
         {diff}
-        {format === "pts" ? " pts" : "%"}
+        {format === "pts" ? ` ${t("pts")}` : "%"}
       </span>{" "}
-      <span className="hidden xl:inline">vs prior 30 days</span>
+      <span className="hidden xl:inline">{t("vs prior 30 days")}</span>
     </span>
   );
 }
@@ -46,6 +48,7 @@ function Kpi({ label, value, change, spark }: { label: string; value: string; ch
 }
 
 function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ dataKey: string; value: number }>; label?: string }) {
+  const t = useT();
   if (!active || !payload?.length) return null;
   return (
     <div className="min-w-40 rounded-md bg-surface px-2.5 py-2 text-xs shadow-pop">
@@ -53,7 +56,7 @@ function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: 
       {SERIES.map((s) => (
         <p key={s.key} className="flex items-center gap-2">
           <span className="size-2 rounded-[2px]" style={{ background: s.color }} aria-hidden />
-          <span className="text-muted">{s.label}</span>
+          <span className="text-muted">{t(s.label)}</span>
           <span className="ml-auto font-medium tabular-nums">{payload.find((p) => p.dataKey === s.key)?.value ?? 0}</span>
         </p>
       ))}
@@ -62,8 +65,9 @@ function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: 
 }
 
 function DailyChart({ data }: { data: DayPoint[] }) {
+  const t = useT();
   return (
-    <div className="h-64 px-2 pt-4 pb-2" role="img" aria-label={`Conversations per day for the last ${data.length} days, split into resolved by AI and handed to a person`}>
+    <div className="h-64 px-2 pt-4 pb-2" role="img" aria-label={t("Conversations per day for the last {n} days, split into resolved by AI and handed to a person", { n: data.length })}>
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={data} barCategoryGap="22%" margin={{ top: 4, right: 12, bottom: 0, left: -18 }}>
           <CartesianGrid vertical={false} stroke="var(--chart-grid)" />
@@ -79,6 +83,7 @@ function DailyChart({ data }: { data: DayPoint[] }) {
 }
 
 export function Overview() {
+  const t = useT();
   const state = useStore();
   const now = useNow();
   const o = useMemo(() => (state ? overview(state, now) : null), [state, now]);
@@ -90,27 +95,27 @@ export function Overview() {
 
   return (
     <>
-      <PageHeader title="Overview" description="How the assistant handled Northfold's support chats in the last 30 days." />
+      <PageHeader title={t("Overview")} description={t("How the assistant handled Northfold's support chats in the last 30 days.")} />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-        <Kpi label="Conversations" value={c.total.toLocaleString("en-US")} change={<Change current={c.total} previous={p.total} />} spark={spark("all")} />
-        <Kpi label="Resolved by AI" value={pct(c.resolutionRate)} change={<Change current={c.resolutionRate} previous={p.resolutionRate} format="pts" />} spark={spark("ai")} />
-        <Kpi label="Handed to a person" value={c.handedOff.toLocaleString("en-US")} change={<Change current={c.handoffRate} previous={p.handoffRate} format="pts" invert />} spark={spark("human")} />
-        <Kpi label="Helpful answers" value={pct(c.helpful)} change={<span className="text-xs text-muted">{c.rated} ratings</span>} />
-        <Kpi label="Median human reply" value={duration(c.medianHumanMinutes * 60_000)} change={<Change current={c.medianHumanMinutes} previous={p.medianHumanMinutes} invert />} />
+        <Kpi label={t("Conversations")} value={formatNumber(c.total)} change={<Change current={c.total} previous={p.total} />} spark={spark("all")} />
+        <Kpi label={t("Resolved by AI")} value={pct(c.resolutionRate)} change={<Change current={c.resolutionRate} previous={p.resolutionRate} format="pts" />} spark={spark("ai")} />
+        <Kpi label={t("Handed to a person")} value={formatNumber(c.handedOff)} change={<Change current={c.handoffRate} previous={p.handoffRate} format="pts" invert />} spark={spark("human")} />
+        <Kpi label={t("Helpful answers")} value={pct(c.helpful)} change={<span className="text-xs text-muted">{t("{n} ratings", { n: c.rated })}</span>} />
+        <Kpi label={t("Median human reply")} value={duration(c.medianHumanMinutes * 60_000)} change={<Change current={c.medianHumanMinutes} previous={p.medianHumanMinutes} invert />} />
       </div>
 
       <div className="mt-3 grid gap-3 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader
-            title="Conversations per day"
+            title={t("Conversations per day")}
             icon={BarChart3}
             meta={
               <span className="flex items-center gap-3">
                 {SERIES.map((s) => (
                   <span key={s.key} className="inline-flex items-center gap-1.5">
                     <span className="size-2 rounded-[2px]" style={{ background: s.color }} aria-hidden />
-                    {s.label}
+                    {t(s.label)}
                   </span>
                 ))}
               </span>
@@ -120,9 +125,9 @@ export function Overview() {
         </Card>
 
         <Card className="flex flex-col">
-          <CardHeader title="Waiting for a person" icon={Clock} meta={<Link href="/admin/inbox/?view=needs-human" className="hover:text-text">Open queue</Link>} />
+          <CardHeader title={t("Waiting for a person")} icon={Clock} meta={<Link href="/admin/inbox/?view=needs-human" className="hover:text-text">{t("Open queue")}</Link>} />
           {waiting.length === 0 ? (
-            <EmptyState icon={Clock} title="Nobody is waiting" text="Handoffs from the assistant appear here." />
+            <EmptyState icon={Clock} title={t("Nobody is waiting")} text={t("Handoffs from the assistant appear here.")} />
           ) : (
             <ul className="divide-y divide-border">
               {waiting.slice(0, 5).map((x) => {
@@ -134,7 +139,7 @@ export function Overview() {
                       <div className="min-w-0 flex-1">
                         <p className="flex items-center gap-2">
                           <span className="truncate font-medium">{x.customer.name}</span>
-                          {x.live && <span className="rounded border border-accent/40 px-1 text-[10px] font-medium text-accent">Live</span>}
+                          {x.live && <span className="rounded border border-accent/40 px-1 text-[10px] font-medium text-accent">{t("Live")}</span>}
                         </p>
                         <p className="truncate text-muted">{q?.text}</p>
                       </div>
@@ -150,20 +155,20 @@ export function Overview() {
 
       <div className="mt-3 grid gap-3 lg:grid-cols-3">
         <Card>
-          <CardHeader title="Topics" icon={Tags} meta="By cited article" />
+          <CardHeader title={t("Topics")} icon={Tags} meta={t("By cited article")} />
           <ul className="space-y-3 p-4">
-            {o.topics.map((t) => {
-              const share = totalTopics ? t.count / totalTopics : 0;
+            {o.topics.map((tp) => {
+              const share = totalTopics ? tp.count / totalTopics : 0;
               return (
-                <li key={t.topic}>
+                <li key={tp.topic}>
                   <div className="flex justify-between gap-3">
-                    <span className="truncate">{t.topic === "other" ? "Not in the help center" : CATEGORIES[t.topic].label}</span>
+                    <span className="truncate">{tp.topic === "other" ? t("Not in the help center") : t(CATEGORIES[tp.topic].label)}</span>
                     <span className="shrink-0 text-muted tabular-nums">
-                      {t.count} · {pct(share)}
+                      {tp.count} · {pct(share)}
                     </span>
                   </div>
                   <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-surface-3">
-                    <div className={cx("h-full rounded-full", t.topic === "other" ? "bg-warning" : "bg-accent")} style={{ width: pct(share) }} />
+                    <div className={cx("h-full rounded-full", tp.topic === "other" ? "bg-warning" : "bg-accent")} style={{ width: pct(share) }} />
                   </div>
                 </li>
               );
@@ -172,19 +177,19 @@ export function Overview() {
         </Card>
 
         <Card className="lg:col-span-2">
-          <CardHeader title="Knowledge gaps" icon={Lightbulb} meta="Questions the assistant couldn't answer confidently" />
+          <CardHeader title={t("Knowledge gaps")} icon={Lightbulb} meta={t("Questions the assistant couldn't answer confidently")} />
           {o.gaps.length === 0 ? (
-            <EmptyState icon={Lightbulb} title="No gaps found" text="Every question in this period matched the help center." />
+            <EmptyState icon={Lightbulb} title={t("No gaps found")} text={t("Every question in this period matched the help center.")} />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left">
                 <thead className="text-xs text-muted">
                   <tr className="border-b border-border">
-                    <th className="px-4 py-2 font-medium">Question</th>
-                    <th className="px-2 py-2 text-right font-medium">Asked</th>
-                    <th className="hidden px-2 py-2 font-medium md:table-cell">Closest article</th>
+                    <th className="px-4 py-2 font-medium">{t("Question")}</th>
+                    <th className="px-2 py-2 text-right font-medium">{t("Asked")}</th>
+                    <th className="hidden px-2 py-2 font-medium md:table-cell">{t("Closest article")}</th>
                     <th className="px-4 py-2 text-right font-medium">
-                      <span className="sr-only">Action</span>
+                      <span className="sr-only">{t("Action")}</span>
                     </th>
                   </tr>
                 </thead>
@@ -193,16 +198,16 @@ export function Overview() {
                     <tr key={g.question}>
                       <td className="max-w-0 px-4 py-2.5">
                         <p className="truncate">{g.question}</p>
-                        <p className="text-xs text-faint">Last asked {timeAgo(g.lastAt, now)}</p>
+                        <p className="text-xs text-faint">{t("Last asked {time}", { time: timeAgo(g.lastAt, now) })}</p>
                       </td>
                       <td className="px-2 py-2.5 text-right text-muted tabular-nums">{g.count}×</td>
                       <td className="hidden max-w-0 px-2 py-2.5 md:table-cell">
-                        <p className="truncate text-muted">{g.closest ?? "None"}</p>
-                        <p className="text-xs text-faint tabular-nums">Best match {pct(g.confidence)}</p>
+                        <p className="truncate text-muted">{g.closest ?? t("None")}</p>
+                        <p className="text-xs text-faint tabular-nums">{t("Best match {pct}", { pct: pct(g.confidence) })}</p>
                       </td>
                       <td className="px-4 py-2.5 text-right whitespace-nowrap">
                         <Link href={`/admin/knowledge/?new=${encodeURIComponent(g.question)}`} className="inline-flex items-center gap-1 font-medium text-accent hover:underline">
-                          Write article <ArrowRight className="size-3.5" aria-hidden />
+                          {t("Write article")} <ArrowRight className="size-3.5" aria-hidden />
                         </Link>
                       </td>
                     </tr>
