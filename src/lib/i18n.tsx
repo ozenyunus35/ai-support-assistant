@@ -100,8 +100,10 @@ function subscribe(cb: () => void) {
 type Ctx = { lang: Lang; setLang: (l: Lang) => void; t: (s: string, vars?: Vars) => string };
 const LangContext = createContext<Ctx>({ lang: "en", setLang: () => {}, t: (s, v) => fill(s, v) });
 
-export function LangProvider({ children }: { children: React.ReactNode }) {
-  const lang = useSyncExternalStore(subscribe, readLang, () => "en" as Lang);
+/** `fixed` pins a part of the site to one language, such as the salon's English booking pages. */
+export function LangProvider({ children, fixed }: { children: React.ReactNode; fixed?: Lang }) {
+  const chosen = useSyncExternalStore(subscribe, readLang, () => "en" as Lang);
+  const lang = fixed ?? chosen;
   setFormatLocale(lang);
   const setLang = useCallback((l: Lang) => {
     try {
